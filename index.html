@@ -368,41 +368,9 @@ body {
 }
 
 /* Legend for boundaries */
-.boundary-legend {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  z-index: 1000;
-  background: rgba(22,33,62,0.9);
-  backdrop-filter: blur(8px);
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  font-size: 11px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-.boundary-legend h4 {
-  font-size: 11px;
-  margin-bottom: 4px;
-  color: var(--text-dim);
-}
-.boundary-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-  cursor: pointer;
-}
-.boundary-swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(255,255,255,0.3);
-}
-.boundary-item.active .boundary-swatch { border: 2px solid #fff; }
+.boundary-legend { display: none; } /* removed, replaced by marker list */
 
-/* Add marker form */
+/* Marker list panel */
 .add-marker-panel {
   position: absolute;
   top: 50%;
@@ -443,43 +411,6 @@ body {
 .overlay.show { display: block; }
 
 /* Collapse system */
-.boundary-legend {
-  transition: all 0.25s ease;
-}
-.boundary-legend.collapsed {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  overflow: hidden;
-  padding: 6px;
-  border-radius: 50%;
-}
-.boundary-legend.collapsed h4,
-.boundary-legend.collapsed #boundaryList { display: none; }
-.boundary-legend .toggle-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 20px;
-  height: 20px;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-}
-.boundary-legend .toggle-btn:hover { color: var(--text); background: rgba(255,255,255,0.1); }
-.boundary-legend.collapsed .toggle-btn {
-  top: 50%;
-  left: 50%;
-  right: auto;
-  transform: translate(-50%,-50%);
-  font-size: 16px;
-}
 
 /* Marker list panel */
 .marker-list-panel {
@@ -637,7 +568,6 @@ body {
     <button class="btn btn-sm" onclick="jumpToYear()">跳转</button>
     <button class="btn btn-sm" onclick="goToPresent()" title="回到现代">📍 现在</button>
     <button class="btn btn-sm" id="btnDraw" onclick="toggleDraw()">✏️ 地图作画</button>
-    <button class="btn btn-sm" id="btnBoundary" onclick="toggleBoundaries()">🗺️ 疆域</button>
     <button class="btn btn-sm" onclick="toggleAddMarker()">📌 添加标记</button>
     <select id="tileSelect" onchange="changeTileLayer()" style="padding:4px 6px;background:rgba(255,255,255,0.08);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px;">
       <option value="satellite">卫星图</option>
@@ -645,7 +575,6 @@ body {
       <option value="street">街道图</option>
     </select>
     <span class="collapse-btns">
-      <button class="btn btn-sm" id="btnCollapseLegend" onclick="toggleBoundaryLegend()" title="折叠/展开疆域图例">📋 图例</button>
       <button class="btn btn-sm" id="btnCollapseMarkerList" onclick="toggleMarkerList()" title="折叠/展开剧情标记列表">📌 标记</button>
       <button class="btn btn-sm" id="btnCollapseBottom" onclick="toggleBottomPanel()" title="折叠/展开底部面板">⬇ 底部</button>
       <button class="btn btn-sm" onclick="exportAllData()" title="导出所有数据">📤 导出</button>
@@ -663,11 +592,6 @@ body {
       <button class="btn" onclick="mapZoomIn()" title="放大">+</button>
       <button class="btn" onclick="mapZoomOut()" title="缩小">−</button>
       <button class="btn" onclick="mapFitWorld()" title="世界视图">⊡</button>
-    </div>
-    <div class="boundary-legend" id="boundaryLegend">
-      <button class="toggle-btn" onclick="toggleBoundaryLegend()" title="折叠/展开">◀</button>
-      <h4>历史疆域</h4>
-      <div id="boundaryList"></div>
     </div>
     <!-- Marker list panel -->
     <div class="marker-list-panel" id="markerListPanel">
@@ -773,10 +697,8 @@ const YEAR_SPAN = YEAR_MAX - YEAR_MIN; // 5525 years
 
 let currentYear = 2025;
 let drawMode = false;
-let showBoundaries = true;
 let drawnItems;
 let drawControl;
-let boundaryLayers = {};
 let markerData = [];
 let pendingMarkerLatLng = null;
 let notesTool = 'pen';
@@ -849,218 +771,6 @@ map.on('click', function(e) {
       `已选择位置: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
   }
 });
-
-// ============================================================
-// HISTORICAL BOUNDARIES DATA
-// ============================================================
-const boundaries = [
-  {
-    id: 'roman',
-    name: '罗马帝国 (巅峰 ~117 CE)',
-    color: '#c41e3a',
-    startYear: -27,
-    endYear: 476,
-    peakYear: 117,
-    coords: [
-      [-6, 55.5], [-1.5, 55.5], [2, 52], [6, 53.5], [10, 48.5], 
-      [16, 46.5], [21, 45], [28, 41.5], [36, 33.5], [42, 33],
-      [42, 31], [36, 30.5], [30, 31.5], [24, 35.5], [18, 37],
-      [14, 43.5], [10, 45], [5.5, 43.5], [-0.5, 44], [-5, 43],
-      [-9.5, 45.5], [-10, 52.5], [-8, 56], [-6, 55.5]
-    ]
-  },
-  {
-    id: 'han',
-    name: '汉朝 (巅峰 ~100 CE)',
-    color: '#c62828',
-    startYear: -202,
-    endYear: 220,
-    peakYear: 100,
-    coords: [
-      [104, 42], [112, 41], [120, 40.5], [124, 40], [128, 35],
-      [122, 30], [119, 25], [113, 22], [109, 21], [106, 22],
-      [103, 25.5], [101, 28], [99, 33], [101, 38], [104, 42]
-    ]
-  },
-  {
-    id: 'mongol',
-    name: '蒙古帝国 (巅峰 ~1279 CE)',
-    color: '#d4a017',
-    startYear: 1206,
-    endYear: 1368,
-    peakYear: 1279,
-    coords: [
-      [87, 55], [105, 55], [125, 53], [135, 45], [128, 38],
-      [122, 32], [117, 28], [108, 25], [103, 28], [98, 34],
-      [85, 38], [70, 40], [55, 45], [45, 50], [37, 50],
-      [45, 54], [60, 56], [87, 55]
-    ]
-  },
-  {
-    id: 'ottoman',
-    name: '奥斯曼帝国 (巅峰 ~1683 CE)',
-    color: '#2e7d32',
-    startYear: 1299,
-    endYear: 1922,
-    peakYear: 1683,
-    coords: [
-      [12, 47.5], [18, 48], [27, 48], [33, 44], [44, 38],
-      [44, 33], [39, 29], [35, 30.5], [31, 31], [25, 36],
-      [20, 40], [16, 44.5], [12, 47.5]
-    ]
-  },
-  {
-    id: 'british',
-    name: '大英帝国 (巅峰 ~1920 CE)',
-    color: '#1565c0',
-    startYear: 1600,
-    endYear: 1997,
-    peakYear: 1920,
-    coords: [
-      // UK
-      [-8, 50], [-2, 50], [0, 52], [-5, 58], [-10, 58], [-8, 50],
-      // India (separate polygon)
-      [68, 35], [90, 28], [96, 22], [88, 8], [76, 8], [72, 20], [68, 25], [68, 35],
-      // Canada
-      [-141, 70], [-60, 70], [-55, 45], [-75, 42], [-85, 46], [-95, 49], [-125, 52], [-141, 60], [-141, 70],
-      // Australia
-      [113, -10], [154, -10], [154, -38], [135, -35], [115, -32], [113, -22], [113, -10],
-    ]
-  },
-  {
-    id: 'axis_europe',
-    name: '轴心国·欧洲 (巅峰 ~1942 CE)',
-    color: '#4a148c',
-    startYear: 1939,
-    endYear: 1945,
-    peakYear: 1942,
-    coords: [
-      [-3, 48], [5, 49], [8, 52], [12, 55], [18, 57], [28, 55],
-      [30, 52], [33, 48], [40, 44], [44, 38], [40, 36], [37, 40],
-      [27, 42], [22, 43.5], [18, 46], [14, 48], [9, 46.5], [3, 47], [-3, 48]
-    ]
-  },
-  {
-    id: 'axis_japan',
-    name: '日本帝国 (巅峰 ~1942 CE)',
-    color: '#e65100',
-    startYear: 1937,
-    endYear: 1945,
-    peakYear: 1942,
-    coords: [
-      [128, 45], [138, 45], [142, 40], [132, 35], [130, 33],
-      [126, 35], [124, 40], [128, 45],
-      // Manchuria / Korea
-      [122, 45], [131, 42], [130, 38], [126, 37], [121, 38.5], [119, 43], [122, 45],
-      // SE Asia coastal
-      [105, 20], [110, 16], [108, 10], [106, 3], [98, 8], [100, 16], [105, 20],
-    ]
-  },
-  {
-    id: 'soviet',
-    name: '苏联/华约 (巅峰 ~1950 CE)',
-    color: '#b71c1c',
-    startYear: 1922,
-    endYear: 1991,
-    peakYear: 1950,
-    coords: [
-      [20, 55], [28, 58], [32, 58], [45, 55], [55, 50], [65, 48],
-      [78, 52], [95, 55], [120, 55], [140, 50], [150, 55], [170, 60],
-      [180, 65], [-170, 65], [30, 65], [20, 65], [20, 55]
-    ]
-  },
-  {
-    id: 'napoleon',
-    name: '拿破仑帝国 (巅峰 ~1812 CE)',
-    color: '#1e88e5',
-    startYear: 1804,
-    endYear: 1815,
-    peakYear: 1812,
-    coords: [
-      [-8, 48], [-3, 52], [2, 53.5], [5, 51], [12, 53], [14, 46],
-      [18, 44], [15, 41.5], [12, 42], [9, 43.5], [7, 47], [3, 46],
-      [-2, 44], [-6, 47], [-9, 46], [-8, 48]
-    ]
-  },
-  {
-    id: 'alexander',
-    name: '亚历山大大帝帝国 (~323 BCE)',
-    color: '#ffa000',
-    startYear: -336,
-    endYear: -323,
-    peakYear: -323,
-    coords: [
-      [20, 41], [23, 42.5], [26, 43], [29, 41], [34, 39], [44, 38],
-      [50, 38], [60, 36], [70, 33], [72, 30], [70, 28], [65, 26],
-      [70, 31], [68, 34], [60, 35], [50, 36], [44, 36], [34, 36],
-      [30, 37], [25, 38], [20, 41]
-    ]
-  },
-];
-
-// Build boundary layers
-function createBoundaryLayers() {
-  boundaries.forEach(b => {
-    const layer = L.polygon(b.coords.map(([lng, lat]) => [lat, lng]), {
-      color: b.color,
-      weight: 2,
-      opacity: 0.8,
-      fillColor: b.color,
-      fillOpacity: 0.2,
-      dashArray: '5, 5',
-    });
-    layer.bindTooltip(b.name, { sticky: true });
-    layer._boundaryData = b;
-    boundaryLayers[b.id] = layer;
-  });
-  updateBoundaryLegend();
-}
-
-function updateBoundariesForYear(year) {
-  Object.entries(boundaryLayers).forEach(([id, layer]) => {
-    const b = layer._boundaryData;
-    const buffer = 30; // show boundary slightly before/after actual dates
-    if (year >= b.startYear - buffer && year <= b.endYear + buffer) {
-      if (!map.hasLayer(layer) && showBoundaries) {
-        layer.addTo(map);
-      }
-      // Adjust opacity based on proximity to peak
-      const distToPeak = Math.abs(year - b.peakYear);
-      const maxDist = Math.max(Math.abs(b.endYear - b.peakYear), Math.abs(b.startYear - b.peakYear)) + buffer;
-      const opacity = Math.max(0.1, 1 - (distToPeak / maxDist) * 0.9);
-      layer.setStyle({ fillOpacity: opacity * 0.3, opacity: opacity * 0.8 });
-    } else {
-      if (map.hasLayer(layer)) map.removeLayer(layer);
-    }
-  });
-}
-
-function updateBoundaryLegend() {
-  const list = document.getElementById('boundaryList');
-  list.innerHTML = boundaries.map(b => `
-    <div class="boundary-item" onclick="flyToBoundary('${b.id}')">
-      <div class="boundary-swatch" style="background:${b.color}"></div>
-      <span>${b.name}</span>
-    </div>
-  `).join('');
-}
-
-function flyToBoundary(id) {
-  const layer = boundaryLayers[id];
-  if (layer) {
-    map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 6 });
-  }
-}
-
-function toggleBoundaries() {
-  showBoundaries = !showBoundaries;
-  document.getElementById('btnBoundary').classList.toggle('active', showBoundaries);
-  if (!showBoundaries) {
-    Object.values(boundaryLayers).forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
-  } else {
-    updateBoundariesForYear(currentYear);
-  }
-}
 
 // ============================================================
 // SAMPLE MARKERS (clickable with images/notes)
@@ -1496,9 +1206,6 @@ function updateYear(year) {
   document.getElementById('yearDisplay').textContent = formatYear(year);
   document.getElementById('timeIndicator').textContent = formatYear(year);
   
-  // Update boundaries
-  if (showBoundaries) updateBoundariesForYear(year);
-  
   // Update markers
   filterMarkersByYear(year);
   
@@ -1921,15 +1628,6 @@ function changeTileLayer() {
 // ============================================================
 // COLLAPSE TOGGLES
 // ============================================================
-function toggleBoundaryLegend() {
-  const legend = document.getElementById('boundaryLegend');
-  const btn = document.getElementById('btnCollapseLegend');
-  const toggleBtn = legend.querySelector('.toggle-btn');
-  legend.classList.toggle('collapsed');
-  btn.classList.toggle('collapsed');
-  toggleBtn.textContent = legend.classList.contains('collapsed') ? '▶' : '◀';
-}
-
 function toggleBottomPanel() {
   const panel = document.getElementById('bottomPanel');
   const btn = document.getElementById('btnCollapseBottom');
@@ -2268,7 +1966,6 @@ function importAllData() {
 function init() {
   createScaleMarks();
   buildParallelTracks();
-  createBoundaryLayers();
   createMarkers();
   buildMarkerList();
   
@@ -2285,15 +1982,14 @@ function init() {
   // Initial notes canvas sizing
   setTimeout(resizeNotesCanvas, 100);
   
-  // Load saved boundaries preference
-  updateBoundariesForYear(currentYear);
+  // Initial notes canvas sizing
+  setTimeout(resizeNotesCanvas, 100);
   
   console.log('🌍 历史地理交互地图已就绪');
   console.log('  🖱️ 拖拽时间轴探索不同时期');
-  console.log('  ⌨️ 键盘 ← → 微调年份 (Shift+←→ 大步调整)');
-  console.log('  📌 点击地图添加标记');
+  console.log('  ⌨️ 键盘 ← → 微调年份 (Ctrl+箭头=10)');
+  console.log('  📌 点击地图添加标记，左侧面板查看全部标记');
   console.log('  ✏️ 工具栏开启地图自由绘画');
-  console.log('  🗺️ 历史疆域叠加层自动随年份变化');
   console.log('  📝 底部笔记面板随年份切换');
   console.log('  🖊️ 笔记面板支持自由绘画、插入图片/链接');
 }
