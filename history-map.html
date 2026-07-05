@@ -547,6 +547,8 @@ body {
     <span class="collapse-btns">
       <button class="btn btn-sm" id="btnCollapseLegend" onclick="toggleBoundaryLegend()" title="折叠/展开疆域图例">📋 图例</button>
       <button class="btn btn-sm" id="btnCollapseBottom" onclick="toggleBottomPanel()" title="折叠/展开底部面板">⬇ 底部</button>
+      <button class="btn btn-sm" onclick="exportAllData()" title="导出所有数据">📤 导出</button>
+      <button class="btn btn-sm" onclick="importAllData()" title="从文件导入数据">📥 导入</button>
     </span>
   </div>
 </div>
@@ -723,9 +725,14 @@ drawControl = new L.Control.Draw({
 
 map.on(L.Draw.Event.CREATED, function(e) {
   drawnItems.addLayer(e.layer);
+  saveDataToStorage();
 });
-map.on(L.Draw.Event.EDITED, function() {});
-map.on(L.Draw.Event.DELETED, function() {});
+map.on(L.Draw.Event.EDITED, function() {
+  saveDataToStorage();
+});
+map.on(L.Draw.Event.DELETED, function() {
+  saveDataToStorage();
+});
 
 // Click on map to set marker position
 map.on('click', function(e) {
@@ -1294,6 +1301,13 @@ function resizeNotesCanvas() {
 
 function saveNotesForYear(year) {
   notesHistory[year] = notesCanvas.toDataURL();
+  // Throttled localStorage save for notes
+  if (!saveNotesForYear._timeout) {
+    saveNotesForYear._timeout = setTimeout(() => {
+      saveNotesForYear._timeout = null;
+      saveDataToStorage();
+    }, 2000);
+  }
 }
 
 function loadNotesForYear(year) {
@@ -1608,9 +1622,167 @@ function saveMarker() {
 
   toggleAddMarker();
   
-  // Persistence hint
+  // Save to localStorage
+  saveDataToStorage();
   console.log('Marker saved:', newMarker);
-  alert(`✅ 标记 "${title}" 已添加！\n刷新后标记会丢失，可通过 localStorage 持久化。`);
+  alert(`✅ 标记 "${title}" 已添加！数据已自动保存。`);
+}
+
+// ============================================================
+// LOCAL STORAGE PERSISTENCE
+// ============================================================
+function saveDataToStorage() {
+  try {
+    // Save custom markers (excluding sample ones - save only those without Wikipedia images)
+    const customMarkers = markerData.map(m => ({
+      title: m.title, lat: m.lat, lng: m.lng,
+      startYear: m.startYear, endYear: m.endYear,
+      image: m.image, link: m.link, note: m.note
+    }));
+    localStorage.setItem('history_map_markers', JSON.stringify(customMarkers));
+    
+    // Save notes (canvas images as base64)
+    const notesToSave = {};
+    Object.entries(notesHistory).forEach(([year, dataUrl]) => {
+      notesToSave[year] = dataUrl;
+    });
+    localStorage.setItem('history_map_notes', JSON.stringify(notesToSave));
+    
+    // Save drawn items on map (bounding boxes)
+    const drawnData = [];
+    drawnItems.eachLayer(layer => {
+      if (layer.toGeoJSON) {
+        drawnData.push(layer.toGeoJSON());
+      }
+    });
+    localStorage.setItem('history_map_drawings', JSON.stringify(drawnData));
+    
+    console.log('💾 数据已保存到 localStorage');
+  } catch(e) {
+    console.warn('⚠️ localStorage 保存失败:', e.message);
+  }
+}
+
+function loadDataFromStorage() {
+  try {
+    // Load custom markers
+    const savedMarkers = JSON.parse(localStorage.getItem('history_map_markers') || '[]');
+    savedMarkers.forEach(m => {
+      // Check if already exists
+      const exists = sampleMarkers.some(sm => sm.title === m.title && sm.lat === m.lat);
+      if (!exists) {
+        sampleMarkers.push(m);
+        const marker = addMarkerToMap(m);
+        m._container = marker;
+        markerData.push(m);
+        if (currentYear >= m.startYear && currentYear <= m.endYear) {
+          marker.addTo(map);
+          marker.setOpacity(1);
+        }
+      }
+    });
+    
+    // Load notes
+    const savedNotes = JSON.parse(localStorage.getItem('history_map_notes') || '{}');
+    Object.entries(savedNotes).forEach(([year, dataUrl]) => {
+      notesHistory[parseInt(year)] = dataUrl;
+    });
+    
+    // Load drawings
+    const savedDrawings = JSON.parse(localStorage.getItem('history_map_drawings') || '[]');
+    savedDrawings.forEach(geo => {
+      L.geoJSON(geo, {
+        style: () => ({ color: geo.properties?.color || '#ff6b6b', weight: 2 })
+      }).addTo(drawnItems);
+    });
+    
+    console.log('📂 已从 localStorage 加载数据');
+  } catch(e) {
+    console.warn('⚠️ localStorage 加载失败:', e.message);
+  }
+}
+
+// Export all data as JSON file
+function exportAllData() {
+  const exportData = {
+    markers: markerData.map(m => ({
+      title: m.title, lat: m.lat, lng: m.lng,
+      startYear: m.startYear, endYear: m.endYear,
+      image: m.image, link: m.link, note: m.note
+    })),
+    notes: notesHistory,
+    drawings: (() => {
+      const data = [];
+      drawnItems.eachLayer(layer => {
+        if (layer.toGeoJSON) data.push(layer.toGeoJSON());
+      });
+      return data;
+    })(),
+    exportTime: new Date().toISOString(),
+  };
+  
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `history-map-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  console.log('📤 数据已导出');
+}
+
+// Import data from JSON file
+function importAllData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const importData = JSON.parse(ev.target.result);
+        if (confirm(`确认导入？\n- ${(importData.markers||[]).length} 个标记\n- ${Object.keys(importData.notes||{}).length} 个时间点笔记\n- ${(importData.drawings||[]).length} 个地图绘画\n\n导入会覆盖当前数据。`)) {
+          // Clear existing custom markers
+          markerData.forEach(m => {
+            if (m._container && map.hasLayer(m._container)) map.removeLayer(m._container);
+          });
+          markerData = [];
+          
+          // Import markers
+          (importData.markers || []).forEach(m => {
+            markerData.push(m);
+            sampleMarkers.push(m);
+            const marker = addMarkerToMap(m);
+            m._container = marker;
+          });
+          
+          // Import notes
+          notesHistory = {};
+          Object.entries(importData.notes || {}).forEach(([year, dataUrl]) => {
+            notesHistory[parseInt(year)] = dataUrl;
+          });
+          
+          // Import drawings
+          drawnItems.clearLayers();
+          (importData.drawings || []).forEach(geo => {
+            L.geoJSON(geo, { style: () => ({ color: geo.properties?.color || '#ff6b6b', weight: 2 }) }).addTo(drawnItems);
+          });
+          
+          saveDataToStorage();
+          updateYear(currentYear);
+          loadNotesForYear(currentYear);
+          alert('✅ 导入成功！');
+        }
+      } catch(err) {
+        alert('❌ 导入失败：文件格式错误');
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 // ============================================================
@@ -1621,6 +1793,9 @@ function init() {
   buildParallelTracks();
   createBoundaryLayers();
   createMarkers();
+  
+  // Load saved data from localStorage
+  loadDataFromStorage();
   
   // Initial year
   updateYear(2025);
