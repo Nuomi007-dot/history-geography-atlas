@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>历史地理交互地图 · Historical Geography Atlas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+<style>
+:root {
+  --bg: #1a1a2e;
+  --panel-bg: #16213e;
+  --accent: #e8a850;
+  --accent2: #4ecdc4;
+  --accent3: #ff6b6b;
+  --text: #e0e0e0;
+  --text-dim: #8892a4;
+  --border: #2a3a5c;
+  --slider-track: #2a3a5c;
+  --slider-fill: #e8a850;
+  --china: #c62828;
+  --europe: #1565c0;
+  --middle-east: #2e7d32;
+  --wars: #6a1b9a;
+  --rome: #c41e3a;
+  --mongol: #d4a017;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 1000;
+  flex-shrink: 0;
+}
+.header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.header h1 span { color: var(--accent); }
+.header .controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.year-display {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 90px;
+  text-align: center;
+}
+.btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.btn:hover { background: rgba(255,255,255,0.12); border-color: var(--accent); }
+.btn.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 600; }
+.btn-sm { padding: 3px 8px; font-size: 11px; }
+
+/* Main Layout */
+.main-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* Map */
+.map-wrapper {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+#map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Map toolbar overlay */
+.map-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.map-toolbar .btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  border-radius: 4px;
+}
+
+/* Time indicator overlay on map */
+.time-indicator {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(22,33,62,0.9);
+  backdrop-filter: blur(8px);
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* Bottom Panel */
+.bottom-panel {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Timeline Panel */
+.timeline-panel {
+  padding: 8px 24px 0;
+  position: relative;
+}
+
+.timeline-slider-container {
+  position: relative;
+  height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+#timeline-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--slider-track);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+#timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(232,168,80,0.5);
+  border: 2px solid #fff;
+}
+#timeline-slider::-moz-range-thumb {
+  width: 18px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(232,168,80,0.5);
+  border: 2px solid #fff;
+}
+
+/* Scale marks */
+.scale-marks {
+  position: relative;
+  height: 20px;
+  margin-top: 2px;
+}
+.scale-mark {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.scale-mark::before {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 6px;
+  background: var(--text-dim);
+  margin: 0 auto 1px;
+}
+.scale-mark.major {
+  font-size: 10px;
+  color: var(--text);
+  font-weight: 600;
+}
+.scale-mark.major::before {
+  height: 10px;
+  background: var(--accent);
+  width: 2px;
+}
+
+/* Parallel Tracks */
+.tracks-panel {
+  padding: 4px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.track-row {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  gap: 8px;
+}
+.track-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: right;
+  font-weight: 600;
+}
+.track-bar {
+  flex: 1;
+  height: 14px;
+  position: relative;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+}
+.track-segment {
+  position: absolute;
+  height: 100%;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.track-segment:hover {
+  filter: brightness(1.4);
+  z-index: 2;
+}
+.track-cursor {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 18px;
+  background: #fff;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(255,255,255,0.4);
+}
+
+/* Track colors */
+.tc-world { background: linear-gradient(90deg, #607d8b, #78909c, #90a4ae, #b0bec5); }
+.tc-china { background: linear-gradient(90deg, #b71c1c, #c62828, #d32f2f, #e53935, #ef5350); }
+.tc-europe { background: linear-gradient(90deg, #0d47a1, #1565c0, #1976d2, #1e88e5, #42a5f5); }
+.tc-mideast { background: linear-gradient(90deg, #1b5e20, #2e7d32, #388e3c, #43a047, #66bb6a); }
+.tc-wars { background: linear-gradient(90deg, #4a148c, #6a1b9a, #7b1fa2, #8e24aa, #ab47bc); }
+
+/* Notes Panel */
+.notes-panel {
+  height: 200px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.notes-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 12px;
+  background: rgba(0,0,0,0.3);
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.notes-toolbar .btn { font-size: 12px; }
+.color-picker {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+.color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.color-picker::-webkit-color-swatch { border: none; border-radius: 2px; }
+.brush-size {
+  width: 60px;
+  font-size: 11px;
+}
+.separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+#notesCanvas {
+  flex: 1;
+  cursor: crosshair;
+  background: #faf9f5;
+  border-radius: 0;
+}
+#notesCanvas.eraser { cursor: cell; }
+
+/* Marker popup custom */
+.leaflet-popup-content-wrapper {
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.leaflet-popup-tip { background: var(--panel-bg); }
+.marker-popup h3 {
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+.marker-popup img {
+  max-width: 200px;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+.marker-popup .note {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.marker-popup a {
+  color: var(--accent2);
+  font-size: 12px;
+}
+
+/* Legend for boundaries */
+.boundary-legend {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 1000;
+  background: rgba(22,33,62,0.9);
+  backdrop-filter: blur(8px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.boundary-legend h4 {
+  font-size: 11px;
+  margin-bottom: 4px;
+  color: var(--text-dim);
+}
+.boundary-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.boundary-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.boundary-item.active .boundary-swatch { border: 2px solid #fff; }
+
+/* Add marker form */
+.add-marker-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: none;
+  min-width: 280px;
+}
+.add-marker-panel.show { display: block; }
+.add-marker-panel h3 { font-size: 14px; margin-bottom: 10px; color: var(--accent); }
+.add-marker-panel input,
+.add-marker-panel textarea {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.add-marker-panel textarea { height: 60px; resize: vertical; }
+.add-marker-panel .btn-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+
+/* Overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1999;
+  display: none;
+}
+.overlay.show { display: block; }
+
+/* Collapse system */
+.boundary-legend {
+  transition: all 0.25s ease;
+}
+.boundary-legend.collapsed {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  overflow: hidden;
+  padding: 6px;
+  border-radius: 50%;
+}
+.boundary-legend.collapsed h4,
+.boundary-legend.collapsed #boundaryList { display: none; }
+.boundary-legend .toggle-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+.boundary-legend .toggle-btn:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+.boundary-legend.collapsed .toggle-btn {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%,-50%);
+  font-size: 16px;
+}
+
+/* Bottom panel collapse */
+.bottom-panel { transition: all 0.25s ease; overflow: hidden; }
+.bottom-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  background: rgba(0,0,0,0.3);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  gap: 6px;
+  transition: background 0.15s;
+  user-select: none;
+}
+.bottom-toggle-bar:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.bottom-toggle-bar .arrow { transition: transform 0.25s; font-size: 10px; }
+.bottom-panel.collapsed .bottom-toggle-bar .arrow { transform: rotate(180deg); }
+.bottom-panel.collapsed .timeline-panel,
+.bottom-panel.collapsed .tracks-panel,
+.bottom-panel.collapsed .notes-panel { display: none; }
+.bottom-panel.collapsed { min-height: auto; }
+
+/* Mini timeline for collapsed mode */
+.mini-timeline {
+  display: none;
+  padding: 6px 24px;
+  background: rgba(0,0,0,0.2);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.bottom-panel.collapsed .mini-timeline { display: flex; align-items: center; gap: 10px; }
+.mini-timeline .mini-year { font-size: 13px; font-weight: 700; color: var(--accent); min-width: 70px; }
+.mini-timeline input { flex: 1; }
+
+/* Header collapse buttons */
+.collapse-btns { display: flex; gap: 0; margin-left: 4px; }
+.collapse-btns .btn {
+  border-radius: 0;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+.collapse-btns .btn:first-child { border-radius: 4px 0 0 4px; }
+.collapse-btns .btn:last-child { border-radius: 0 4px 4px 0; }
+.collapse-btns .btn.collapsed { opacity: 0.5; background: rgba(255,255,255,0.03); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header h1 { font-size: 13px; }
+  .year-display { font-size: 16px; min-width: 60px; }
+  .notes-panel { height: 150px; }
+  .collapse-btns { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>🌍 <span>历史地理</span>交互地图 · Historical Geography Atlas</h1>
+  <div class="controls">
+    <span style="font-size:11px;color:var(--text-dim)">当前年份:</span>
+    <span class="year-display" id="yearDisplay">2025 CE</span>
+    <button class="btn btn-sm" onclick="goToPresent()" title="回到现代">📍 现在</button>
+    <button class="btn btn-sm" id="btnDraw" onclick="toggleDraw()">✏️ 地图作画</button>
+    <button class="btn btn-sm" id="btnBoundary" onclick="toggleBoundaries()">🗺️ 疆域</button>
+    <button class="btn btn-sm" onclick="toggleAddMarker()">📌 添加标记</button>
+    <select id="tileSelect" onchange="changeTileLayer()" style="padding:4px 6px;background:rgba(255,255,255,0.08);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:11px;">
+      <option value="satellite">卫星图</option>
+      <option value="terrain">地形图</option>
+      <option value="street">街道图</option>
+    </select>
+    <span class="collapse-btns">
+      <button class="btn btn-sm" id="btnCollapseLegend" onclick="toggleBoundaryLegend()" title="折叠/展开疆域图例">📋 图例</button>
+      <button class="btn btn-sm" id="btnCollapseBottom" onclick="toggleBottomPanel()" title="折叠/展开底部面板">⬇ 底部</button>
+    </span>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main-container">
+  <div class="map-wrapper">
+    <div id="map"></div>
+    <div class="time-indicator" id="timeIndicator">2025 CE</div>
+    <div class="map-toolbar">
+      <button class="btn" onclick="mapZoomIn()" title="放大">+</button>
+      <button class="btn" onclick="mapZoomOut()" title="缩小">−</button>
+      <button class="btn" onclick="mapFitWorld()" title="世界视图">⊡</button>
+    </div>
+    <div class="boundary-legend" id="boundaryLegend">
+      <button class="toggle-btn" onclick="toggleBoundaryLegend()" title="折叠/展开">◀</button>
+      <h4>历史疆域</h4>
+      <div id="boundaryList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Panel -->
+<div class="bottom-panel" id="bottomPanel">
+  <div class="bottom-toggle-bar" onclick="toggleBottomPanel()" title="折叠/展开底部面板">
+    <span>📋 时间轴 & 笔记</span>
+    <span class="arrow">▲</span>
+  </div>
+  <!-- Mini timeline (shown when collapsed) -->
+  <div class="mini-timeline">
+    <span class="mini-year" id="miniYear">2025 CE</span>
+    <input type="range" id="mini-timeline-slider" min="0" max="10000" value="10000" step="1" oninput="onMiniSliderInput()">
+    <button class="btn btn-sm" onclick="goToPresent()">📍</button>
+  </div>
+  <!-- Timeline -->
+  <div class="timeline-panel">
+    <div class="timeline-slider-container">
+      <input type="range" id="timeline-slider" min="0" max="10000" value="10000" step="1">
+    </div>
+    <div class="scale-marks" id="scaleMarks"></div>
+  </div>
+
+  <!-- Parallel Tracks -->
+  <div class="tracks-panel">
+    <div class="track-row">
+      <span class="track-label">🌐 世界历史</span>
+      <div class="track-bar" id="trackWorld"><div class="track-cursor"></div></div>
+    </div>
+    <div class="track-row">
+      <span class="track-label">🇨🇳 中国历史</span>
+      <div class="track-bar" id="trackChina"><div class="track-cursor"></div></div>
+    </div>
+    <div class="track-row">
+      <span class="track-label">🏛️ 欧洲/西方</span>
+      <div class="track-bar" id="trackEurope"><div class="track-cursor"></div></div>
+    </div>
+    <div class="track-row">
+      <span class="track-label">🕌 中东历史</span>
+      <div class="track-bar" id="trackMideast"><div class="track-cursor"></div></div>
+    </div>
+    <div class="track-row">
+      <span class="track-label">⚔️ 重大战争</span>
+      <div class="track-bar" id="trackWars"><div class="track-cursor"></div></div>
+    </div>
+  </div>
+
+  <!-- Notes Panel -->
+  <div class="notes-panel">
+    <div class="notes-toolbar">
+      <button class="btn btn-sm active" id="toolPen" onclick="setNotesTool('pen')">🖊️ 画笔</button>
+      <button class="btn btn-sm" id="toolEraser" onclick="setNotesTool('eraser')">🧹 橡皮</button>
+      <button class="btn btn-sm" id="toolText" onclick="setNotesTool('text')">T 文字</button>
+      <input type="color" class="color-picker" id="notesColor" value="#1a1a2e" onchange="updateBrushColor()">
+      <input type="range" id="brushSize" class="brush-size" min="1" max="20" value="3" oninput="updateBrushSize()">
+      <span style="font-size:10px;color:var(--text-dim)" id="brushSizeLabel">3px</span>
+      <span class="separator"></span>
+      <button class="btn btn-sm" onclick="insertImage()">🖼️ 插图</button>
+      <button class="btn btn-sm" onclick="insertLink()">🔗 插链接</button>
+      <button class="btn btn-sm" onclick="clearNotes()">🗑️ 清空</button>
+      <span style="margin-left:auto;font-size:10px;color:var(--text-dim)">笔记随当前时间点变化</span>
+    </div>
+    <canvas id="notesCanvas"></canvas>
+  </div>
+</div>
+
+<!-- Add Marker Dialog -->
+<div class="overlay" id="overlay" onclick="toggleAddMarker()"></div>
+<div class="add-marker-panel" id="addMarkerPanel">
+  <h3>📌 在地图上添加标记</h3>
+  <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">先在地图上点击选择位置，然后填写信息</div>
+  <input type="text" id="markerTitle" placeholder="标题（如：罗马斗兽场）">
+  <input type="text" id="markerImage" placeholder="图片链接 URL">
+  <input type="text" id="markerLink" placeholder="参考链接 URL">
+  <textarea id="markerNote" placeholder="随记内容..."></textarea>
+  <div style="display:flex;gap:8px;">
+    <input type="number" id="markerStartYear" placeholder="起始年份" style="flex:1" value="1900">
+    <input type="number" id="markerEndYear" placeholder="结束年份" style="flex:1" value="2025">
+  </div>
+  <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">输入负值表示公元前（如 -27 = 27 BCE）</div>
+  <div class="btn-row">
+    <button class="btn btn-sm" onclick="toggleAddMarker()">取消</button>
+    <button class="btn btn-sm active" onclick="saveMarker()">保存标记</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+const YEAR_MIN = -3500;  // 3500 BCE
+const YEAR_MAX = 2025;   // 2025 CE
+const YEAR_SPAN = YEAR_MAX - YEAR_MIN; // 5525 years
+
+let currentYear = 2025;
+let drawMode = false;
+let showBoundaries = true;
+let drawnItems;
+let drawControl;
+let boundaryLayers = {};
+let markerData = [];
+let pendingMarkerLatLng = null;
+let notesTool = 'pen';
+let notesLayers = {}; // year -> canvas data
+
+// ============================================================
+// MAP INITIALIZATION
+// ============================================================
+const map = L.map('map', {
+  center: [30, 25],
+  zoom: 3,
+  zoomControl: false,
+  minZoom: 2,
+  maxZoom: 18,
+  worldCopyJump: true,
+});
+
+const tileLayers = {
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    maxZoom: 18,
+  }),
+  terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors, SRTM | © OpenTopoMap',
+    maxZoom: 17,
+  }),
+  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+  }),
+};
+
+let currentTile = tileLayers.satellite;
+currentTile.addTo(map);
+
+// Drawing layer
+drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+// Initialize draw control
+drawControl = new L.Control.Draw({
+  draw: {
+    polygon: { shapeOptions: { color: '#ff6b6b', weight: 2 } },
+    polyline: { shapeOptions: { color: '#4ecdc4', weight: 3 } },
+    rectangle: { shapeOptions: { color: '#e8a850', weight: 2 } },
+    circle: { shapeOptions: { color: '#42a5f5', weight: 2 } },
+    marker: false,
+    circlemarker: false,
+  },
+  edit: { featureGroup: drawnItems },
+});
+// Don't add by default - toggle with button
+
+map.on(L.Draw.Event.CREATED, function(e) {
+  drawnItems.addLayer(e.layer);
+});
+map.on(L.Draw.Event.EDITED, function() {});
+map.on(L.Draw.Event.DELETED, function() {});
+
+// Click on map to set marker position
+map.on('click', function(e) {
+  if (document.getElementById('addMarkerPanel').classList.contains('show')) {
+    pendingMarkerLatLng = e.latlng;
+    document.getElementById('addMarkerPanel').querySelector('div').textContent = 
+      `已选择位置: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+  }
+});
+
+// ============================================================
+// HISTORICAL BOUNDARIES DATA
+// ============================================================
+const boundaries = [
+  {
+    id: 'roman',
+    name: '罗马帝国 (巅峰 ~117 CE)',
+    color: '#c41e3a',
+    startYear: -27,
+    endYear: 476,
+    peakYear: 117,
+    coords: [
+      [-6, 55.5], [-1.5, 55.5], [2, 52], [6, 53.5], [10, 48.5], 
+      [16, 46.5], [21, 45], [28, 41.5], [36, 33.5], [42, 33],
+      [42, 31], [36, 30.5], [30, 31.5], [24, 35.5], [18, 37],
+      [14, 43.5], [10, 45], [5.5, 43.5], [-0.5, 44], [-5, 43],
+      [-9.5, 45.5], [-10, 52.5], [-8, 56], [-6, 55.5]
+    ]
+  },
+  {
+    id: 'han',
+    name: '汉朝 (巅峰 ~100 CE)',
+    color: '#c62828',
+    startYear: -202,
+    endYear: 220,
+    peakYear: 100,
+    coords: [
+      [104, 42], [112, 41], [120, 40.5], [124, 40], [128, 35],
+      [122, 30], [119, 25], [113, 22], [109, 21], [106, 22],
+      [103, 25.5], [101, 28], [99, 33], [101, 38], [104, 42]
+    ]
+  },
+  {
+    id: 'mongol',
+    name: '蒙古帝国 (巅峰 ~1279 CE)',
+    color: '#d4a017',
+    startYear: 1206,
+    endYear: 1368,
+    peakYear: 1279,
+    coords: [
+      [87, 55], [105, 55], [125, 53], [135, 45], [128, 38],
+      [122, 32], [117, 28], [108, 25], [103, 28], [98, 34],
+      [85, 38], [70, 40], [55, 45], [45, 50], [37, 50],
+      [45, 54], [60, 56], [87, 55]
+    ]
+  },
+  {
+    id: 'ottoman',
+    name: '奥斯曼帝国 (巅峰 ~1683 CE)',
+    color: '#2e7d32',
+    startYear: 1299,
+    endYear: 1922,
+    peakYear: 1683,
+    coords: [
+      [12, 47.5], [18, 48], [27, 48], [33, 44], [44, 38],
+      [44, 33], [39, 29], [35, 30.5], [31, 31], [25, 36],
+      [20, 40], [16, 44.5], [12, 47.5]
+    ]
+  },
+  {
+    id: 'british',
+    name: '大英帝国 (巅峰 ~1920 CE)',
+    color: '#1565c0',
+    startYear: 1600,
+    endYear: 1997,
+    peakYear: 1920,
+    coords: [
+      // UK
+      [-8, 50], [-2, 50], [0, 52], [-5, 58], [-10, 58], [-8, 50],
+      // India (separate polygon)
+      [68, 35], [90, 28], [96, 22], [88, 8], [76, 8], [72, 20], [68, 25], [68, 35],
+      // Canada
+      [-141, 70], [-60, 70], [-55, 45], [-75, 42], [-85, 46], [-95, 49], [-125, 52], [-141, 60], [-141, 70],
+      // Australia
+      [113, -10], [154, -10], [154, -38], [135, -35], [115, -32], [113, -22], [113, -10],
+    ]
+  },
+  {
+    id: 'axis_europe',
+    name: '轴心国·欧洲 (巅峰 ~1942 CE)',
+    color: '#4a148c',
+    startYear: 1939,
+    endYear: 1945,
+    peakYear: 1942,
+    coords: [
+      [-3, 48], [5, 49], [8, 52], [12, 55], [18, 57], [28, 55],
+      [30, 52], [33, 48], [40, 44], [44, 38], [40, 36], [37, 40],
+      [27, 42], [22, 43.5], [18, 46], [14, 48], [9, 46.5], [3, 47], [-3, 48]
+    ]
+  },
+  {
+    id: 'axis_japan',
+    name: '日本帝国 (巅峰 ~1942 CE)',
+    color: '#e65100',
+    startYear: 1937,
+    endYear: 1945,
+    peakYear: 1942,
+    coords: [
+      [128, 45], [138, 45], [142, 40], [132, 35], [130, 33],
+      [126, 35], [124, 40], [128, 45],
+      // Manchuria / Korea
+      [122, 45], [131, 42], [130, 38], [126, 37], [121, 38.5], [119, 43], [122, 45],
+      // SE Asia coastal
+      [105, 20], [110, 16], [108, 10], [106, 3], [98, 8], [100, 16], [105, 20],
+    ]
+  },
+  {
+    id: 'soviet',
+    name: '苏联/华约 (巅峰 ~1950 CE)',
+    color: '#b71c1c',
+    startYear: 1922,
+    endYear: 1991,
+    peakYear: 1950,
+    coords: [
+      [20, 55], [28, 58], [32, 58], [45, 55], [55, 50], [65, 48],
+      [78, 52], [95, 55], [120, 55], [140, 50], [150, 55], [170, 60],
+      [180, 65], [-170, 65], [30, 65], [20, 65], [20, 55]
+    ]
+  },
+  {
+    id: 'napoleon',
+    name: '拿破仑帝国 (巅峰 ~1812 CE)',
+    color: '#1e88e5',
+    startYear: 1804,
+    endYear: 1815,
+    peakYear: 1812,
+    coords: [
+      [-8, 48], [-3, 52], [2, 53.5], [5, 51], [12, 53], [14, 46],
+      [18, 44], [15, 41.5], [12, 42], [9, 43.5], [7, 47], [3, 46],
+      [-2, 44], [-6, 47], [-9, 46], [-8, 48]
+    ]
+  },
+  {
+    id: 'alexander',
+    name: '亚历山大大帝帝国 (~323 BCE)',
+    color: '#ffa000',
+    startYear: -336,
+    endYear: -323,
+    peakYear: -323,
+    coords: [
+      [20, 41], [23, 42.5], [26, 43], [29, 41], [34, 39], [44, 38],
+      [50, 38], [60, 36], [70, 33], [72, 30], [70, 28], [65, 26],
+      [70, 31], [68, 34], [60, 35], [50, 36], [44, 36], [34, 36],
+      [30, 37], [25, 38], [20, 41]
+    ]
+  },
+];
+
+// Build boundary layers
+function createBoundaryLayers() {
+  boundaries.forEach(b => {
+    const layer = L.polygon(b.coords.map(([lng, lat]) => [lat, lng]), {
+      color: b.color,
+      weight: 2,
+      opacity: 0.8,
+      fillColor: b.color,
+      fillOpacity: 0.2,
+      dashArray: '5, 5',
+    });
+    layer.bindTooltip(b.name, { sticky: true });
+    layer._boundaryData = b;
+    boundaryLayers[b.id] = layer;
+  });
+  updateBoundaryLegend();
+}
+
+function updateBoundariesForYear(year) {
+  Object.entries(boundaryLayers).forEach(([id, layer]) => {
+    const b = layer._boundaryData;
+    const buffer = 30; // show boundary slightly before/after actual dates
+    if (year >= b.startYear - buffer && year <= b.endYear + buffer) {
+      if (!map.hasLayer(layer) && showBoundaries) {
+        layer.addTo(map);
+      }
+      // Adjust opacity based on proximity to peak
+      const distToPeak = Math.abs(year - b.peakYear);
+      const maxDist = Math.max(Math.abs(b.endYear - b.peakYear), Math.abs(b.startYear - b.peakYear)) + buffer;
+      const opacity = Math.max(0.1, 1 - (distToPeak / maxDist) * 0.9);
+      layer.setStyle({ fillOpacity: opacity * 0.3, opacity: opacity * 0.8 });
+    } else {
+      if (map.hasLayer(layer)) map.removeLayer(layer);
+    }
+  });
+}
+
+function updateBoundaryLegend() {
+  const list = document.getElementById('boundaryList');
+  list.innerHTML = boundaries.map(b => `
+    <div class="boundary-item" onclick="flyToBoundary('${b.id}')">
+      <div class="boundary-swatch" style="background:${b.color}"></div>
+      <span>${b.name}</span>
+    </div>
+  `).join('');
+}
+
+function flyToBoundary(id) {
+  const layer = boundaryLayers[id];
+  if (layer) {
+    map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 6 });
+  }
+}
+
+function toggleBoundaries() {
+  showBoundaries = !showBoundaries;
+  document.getElementById('btnBoundary').classList.toggle('active', showBoundaries);
+  if (!showBoundaries) {
+    Object.values(boundaryLayers).forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+  } else {
+    updateBoundariesForYear(currentYear);
+  }
+}
+
+// ============================================================
+// SAMPLE MARKERS (clickable with images/notes)
+// ============================================================
+const sampleMarkers = [
+  {
+    title: '罗马斗兽场',
+    lat: 41.8902, lng: 12.4922,
+    startYear: 72, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Colosseo_2020.jpg/320px-Colosseo_2020.jpg',
+    link: 'https://en.wikipedia.org/wiki/Colosseum',
+    note: '罗马帝国时期建造的椭圆形角斗场，公元72-80年建造。可容纳5-8万观众，是古罗马工程技术的巅峰之作。'
+  },
+  {
+    title: '长城',
+    lat: 40.4319, lng: 116.5704,
+    startYear: -220, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/The_Great_Wall_of_China_at_Jinshanling-edit.jpg/320px-The_Great_Wall_of_China_at_Jinshanling-edit.jpg',
+    link: 'https://en.wikipedia.org/wiki/Great_Wall_of_China',
+    note: '中国古代军事防御工程，最早始于春秋战国时期。现存主要为明代修建，总长度超过21,000公里。'
+  },
+  {
+    title: '诺曼底登陆 (D-Day)',
+    lat: 49.35, lng: -0.85,
+    startYear: 1944, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Into_the_Jaws_of_Death_23-0455M_edit.jpg/320px-Into_the_Jaws_of_Death_23-0455M_edit.jpg',
+    link: 'https://en.wikipedia.org/wiki/Normandy_landings',
+    note: '1944年6月6日，盟军在法国诺曼底发动大规模登陆作战。这是二战西线战场的转折点，标志着纳粹德国的崩溃开始。'
+  },
+  {
+    title: '君士坦丁堡/伊斯坦布尔',
+    lat: 41.0082, lng: 28.9784,
+    startYear: 330, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Hagia_Sophia_Mars_2013.jpg/320px-Hagia_Sophia_Mars_2013.jpg',
+    link: 'https://en.wikipedia.org/wiki/Constantinople',
+    note: '公元330年成为罗马帝国新都。1453年被奥斯曼帝国攻陷，标志着中世纪的结束。圣索菲亚大教堂见证了东西方文明的交汇。'
+  },
+  {
+    title: '库库尔坎金字塔 (奇琴伊察)',
+    lat: 20.6829, lng: -88.5686,
+    startYear: 600, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Chichen_Itza_3.jpg/320px-Chichen_Itza_3.jpg',
+    link: 'https://en.wikipedia.org/wiki/Chichen_Itza',
+    note: '玛雅文明最著名的遗址之一，位于墨西哥尤卡坦半岛。金字塔展现了玛雅人惊人的天文和数学知识。'
+  },
+  {
+    title: '广岛和平纪念公园',
+    lat: 34.3954, lng: 132.4535,
+    startYear: 1945, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Hiroshima_Peace_Memorial_Museum_2008_01.JPG/320px-Hiroshima_Peace_Memorial_Museum_2008_01.JPG',
+    link: 'https://en.wikipedia.org/wiki/Hiroshima_Peace_Memorial_Park',
+    note: '1945年8月6日，人类历史上第一颗原子弹在广岛上空爆炸。原爆圆顶馆作为世界遗产，警示后人和平的可贵。'
+  },
+  {
+    title: '大津巴布韦遗址',
+    lat: -20.2686, lng: 30.9302,
+    startYear: 1100, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Great-Zimbabwe-2.jpg/320px-Great-Zimbabwe-2.jpg',
+    link: 'https://en.wikipedia.org/wiki/Great_Zimbabwe',
+    note: '11-15世纪南部非洲最大的中世纪城市，绍纳王国的中心。石头建筑群证明了非洲本土文明的辉煌成就。'
+  },
+  {
+    title: '柏林墙 (已拆除)',
+    lat: 52.5163, lng: 13.3777,
+    startYear: 1961, endYear: 1989,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Berlin_Wall_1961-11-20.jpg/320px-Berlin_Wall_1961-11-20.jpg',
+    link: 'https://en.wikipedia.org/wiki/Berlin_Wall',
+    note: '1961年8月13日建成，1989年11月9日倒塌。东西柏林的分界线，也是冷战最鲜明的象征。'
+  },
+  {
+    title: '波斯波利斯',
+    lat: 29.9344, lng: 52.8915,
+    startYear: -515, endYear: 2025,
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Persepolis_001.jpg/320px-Persepolis_001.jpg',
+    link: 'https://en.wikipedia.org/wiki/Persepolis',
+    note: '古波斯阿契美尼德帝国的礼仪首都，由大流士一世始建于公元前515年。公元前330年被亚历山大大帝焚毁。'
+  },
+];
+
+function createMarkers() {
+  sampleMarkers.forEach(m => {
+    addMarkerToMap(m);
+  });
+}
+
+function addMarkerToMap(data) {
+  const marker = L.marker([data.lat, data.lng], {
+    opacity: 0,
+    riseOnHover: true,
+  });
+  
+  const startYearBCE = data.startYear < 0 ? `${Math.abs(data.startYear)} BCE` : `${data.startYear} CE`;
+  const endYearStr = data.endYear >= YEAR_MAX ? '至今' : (data.endYear < 0 ? `${Math.abs(data.endYear)} BCE` : `${data.endYear} CE`);
+  
+  marker.bindPopup(`
+    <div class="marker-popup">
+      <h3>${data.title}</h3>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">${startYearBCE} — ${endYearStr}</div>
+      ${data.image ? `<img src="${data.image}" alt="${data.title}" onerror="this.style.display='none'" loading="lazy">` : ''}
+      <div class="note">${data.note || ''}</div>
+      ${data.link ? `<a href="${data.link}" target="_blank" rel="noopener">📖 了解更多 →</a>` : ''}
+    </div>
+  `, { maxWidth: 300, className: 'marker-popup-container' });
+  
+  marker._timeData = data;
+  marker._id = 'marker_' + Date.now() + '_' + Math.random();
+  
+  if (!data._container) {
+    data._container = marker;
+  }
+  
+  return marker;
+}
+
+function filterMarkersByYear(year) {
+  sampleMarkers.forEach(m => {
+    if (m._container) {
+      const marker = m._container;
+      if (year >= m.startYear && year <= m.endYear) {
+        if (!map.hasLayer(marker)) {
+          marker.addTo(map);
+          marker.setOpacity(1);
+        }
+      } else {
+        if (map.hasLayer(marker)) {
+          map.removeLayer(marker);
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// TIMELINE LOGIC
+// ============================================================
+const slider = document.getElementById('timeline-slider');
+
+function yearToSliderVal(year) {
+  return ((year - YEAR_MIN) / YEAR_SPAN) * 10000;
+}
+
+function sliderValToYear(val) {
+  return Math.round(YEAR_MIN + (val / 10000) * YEAR_SPAN);
+}
+
+function formatYear(year) {
+  if (year < 0) return `${Math.abs(year)} BCE`;
+  if (year === 0) return '1 CE';
+  return `${year} CE`;
+}
+
+function updateYear(year) {
+  currentYear = year;
+  document.getElementById('yearDisplay').textContent = formatYear(year);
+  document.getElementById('timeIndicator').textContent = formatYear(year);
+  
+  // Update boundaries
+  if (showBoundaries) updateBoundariesForYear(year);
+  
+  // Update markers
+  filterMarkersByYear(year);
+  
+  // Update track cursors
+  updateTrackCursors(year);
+  
+  // Update notes canvas
+  loadNotesForYear(year);
+  
+  // Update slider if not being dragged
+  if (!slider.matches(':active')) {
+    slider.value = yearToSliderVal(year);
+  }
+  // Sync mini timeline
+  syncMiniTimeline(year);
+}
+
+slider.addEventListener('input', () => {
+  const year = sliderValToYear(parseInt(slider.value));
+  updateYear(year);
+});
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const step = e.shiftKey ? 100 : (e.ctrlKey ? 5 : 10);
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    currentYear = Math.min(YEAR_MAX, currentYear + step);
+    updateYear(currentYear);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    currentYear = Math.max(YEAR_MIN, currentYear - step);
+    updateYear(currentYear);
+  }
+});
+
+// Create scale marks
+function createScaleMarks() {
+  const container = document.getElementById('scaleMarks');
+  const marks = [
+    { year: -3500, label: '3500 BCE', major: true },
+    { year: -3000, label: '3000 BCE', major: true },
+    { year: -2500, label: '2500 BCE', major: false },
+    { year: -2000, label: '2000 BCE', major: true },
+    { year: -1500, label: '1500 BCE', major: false },
+    { year: -1000, label: '1000 BCE', major: true },
+    { year: -500, label: '500 BCE', major: true },
+    { year: -221, label: '秦统一', major: false },
+    { year: 0, label: '1 CE', major: true },
+    { year: 476, label: '西罗马亡', major: false },
+    { year: 622, label: '伊斯兰纪元', major: false },
+    { year: 1000, label: '1000 CE', major: true },
+    { year: 1206, label: '蒙古兴起', major: false },
+    { year: 1453, label: '拜占庭亡', major: false },
+    { year: 1492, label: '发现美洲', major: false },
+    { year: 1500, label: '1500 CE', major: true },
+    { year: 1776, label: '美国独立', major: false },
+    { year: 1789, label: '法国革命', major: false },
+    { year: 1800, label: '1800', major: true },
+    { year: 1840, label: '鸦片战争', major: false },
+    { year: 1900, label: '1900', major: true },
+    { year: 1914, label: '一战', major: false },
+    { year: 1939, label: '二战', major: false },
+    { year: 1945, label: '1945', major: false },
+    { year: 1989, label: '冷战结束', major: false },
+    { year: 2000, label: '2000', major: true },
+    { year: 2025, label: '2025', major: true },
+  ];
+
+  marks.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'scale-mark' + (m.major ? ' major' : '');
+    div.style.left = yearToSliderVal(m.year) / 100 + '%';
+    div.textContent = m.label;
+    div.onclick = () => {
+      currentYear = m.year;
+      updateYear(currentYear);
+    };
+    container.appendChild(div);
+  });
+}
+
+// ============================================================
+// PARALLEL HISTORICAL TRACKS
+// ============================================================
+const trackData = {
+  trackWorld: [
+    { label: '古代文明', start: -3500, end: -500, cls: 'tc-world' },
+    { label: '古典时期', start: -500, end: 476, cls: 'tc-world' },
+    { label: '中世纪', start: 476, end: 1453, cls: 'tc-world' },
+    { label: '近代早期', start: 1453, end: 1789, cls: 'tc-world' },
+    { label: '工业革命', start: 1760, end: 1900, cls: 'tc-world' },
+    { label: '现代', start: 1900, end: 2025, cls: 'tc-world' },
+  ],
+  trackChina: [
+    { label: '夏商周', start: -2070, end: -256, cls: 'tc-china' },
+    { label: '秦汉', start: -221, end: 220, cls: 'tc-china' },
+    { label: '魏晋南北朝', start: 220, end: 589, cls: 'tc-china' },
+    { label: '隋唐', start: 581, end: 907, cls: 'tc-china' },
+    { label: '宋元', start: 960, end: 1368, cls: 'tc-china' },
+    { label: '明清', start: 1368, end: 1912, cls: 'tc-china' },
+    { label: '民国/PRC', start: 1912, end: 2025, cls: 'tc-china' },
+  ],
+  trackEurope: [
+    { label: '古希腊', start: -800, end: -146, cls: 'tc-europe' },
+    { label: '古罗马', start: -753, end: 476, cls: 'tc-europe' },
+    { label: '中世纪', start: 476, end: 1400, cls: 'tc-europe' },
+    { label: '文艺复兴', start: 1400, end: 1600, cls: 'tc-europe' },
+    { label: '启蒙时代', start: 1650, end: 1800, cls: 'tc-europe' },
+    { label: '工业革命', start: 1760, end: 1840, cls: 'tc-europe' },
+    { label: '现代欧洲', start: 1900, end: 2025, cls: 'tc-europe' },
+  ],
+  trackMideast: [
+    { label: '苏美尔/巴比伦', start: -3500, end: -539, cls: 'tc-mideast' },
+    { label: '波斯帝国', start: -550, end: -330, cls: 'tc-mideast' },
+    { label: '伊斯兰兴起', start: 622, end: 1258, cls: 'tc-mideast' },
+    { label: '奥斯曼帝国', start: 1299, end: 1922, cls: 'tc-mideast' },
+    { label: '现代中东', start: 1920, end: 2025, cls: 'tc-mideast' },
+  ],
+  trackWars: [
+    { label: '布匿战争', start: -264, end: -146, cls: 'tc-wars' },
+    { label: '十字军东征', start: 1096, end: 1291, cls: 'tc-wars' },
+    { label: '拿破仑战争', start: 1803, end: 1815, cls: 'tc-wars' },
+    { label: '一战', start: 1914, end: 1918, cls: 'tc-wars' },
+    { label: '二战', start: 1939, end: 1945, cls: 'tc-wars' },
+    { label: '冷战', start: 1947, end: 1991, cls: 'tc-wars' },
+  ],
+};
+
+function buildParallelTracks() {
+  Object.entries(trackData).forEach(([trackId, segments]) => {
+    const bar = document.getElementById(trackId);
+    if (!bar) return;
+    
+    segments.forEach(seg => {
+      const left = yearToSliderVal(seg.start) / 100;
+      const width = (yearToSliderVal(seg.end) - yearToSliderVal(seg.start)) / 100;
+      
+      const div = document.createElement('div');
+      div.className = 'track-segment ' + seg.cls;
+      div.style.left = left + '%';
+      div.style.width = Math.max(width, 0.3) + '%';
+      div.title = `${seg.label} (${formatYear(seg.start)} — ${formatYear(seg.end)})`;
+      div.onclick = () => {
+        currentYear = Math.round((seg.start + seg.end) / 2);
+        updateYear(currentYear);
+      };
+      bar.appendChild(div);
+    });
+  });
+}
+
+function updateTrackCursors(year) {
+  const pos = yearToSliderVal(year) / 100;
+  document.querySelectorAll('.track-cursor').forEach(c => {
+    c.style.left = pos + '%';
+  });
+}
+
+// ============================================================
+// NOTES CANVAS
+// ============================================================
+const notesCanvas = document.getElementById('notesCanvas');
+const notesCtx = notesCanvas.getContext('2d');
+let isDrawing = false;
+let notesBrushColor = '#1a1a2e';
+let notesBrushSize = 3;
+let notesHistory = {}; // year -> ImageData
+
+function resizeNotesCanvas() {
+  const rect = notesCanvas.parentElement.getBoundingClientRect();
+  notesCanvas.width = rect.width;
+  notesCanvas.height = rect.height - 
+    notesCanvas.parentElement.querySelector('.notes-toolbar').getBoundingClientRect().height;
+  notesCtx.fillStyle = '#faf9f5';
+  notesCtx.fillRect(0, 0, notesCanvas.width, notesCanvas.height);
+  
+  // Restore current year's notes
+  if (notesHistory[currentYear]) {
+    const img = new Image();
+    img.onload = () => notesCtx.drawImage(img, 0, 0);
+    img.src = notesHistory[currentYear];
+  }
+}
+
+function saveNotesForYear(year) {
+  notesHistory[year] = notesCanvas.toDataURL();
+}
+
+function loadNotesForYear(year) {
+  notesCtx.fillStyle = '#faf9f5';
+  notesCtx.fillRect(0, 0, notesCanvas.width, notesCanvas.height);
+  
+  if (notesHistory[year]) {
+    const img = new Image();
+    img.onload = () => notesCtx.drawImage(img, 0, 0);
+    img.src = notesHistory[year];
+  }
+  
+  // Show year label on canvas
+  notesCtx.fillStyle = 'rgba(0,0,0,0.08)';
+  notesCtx.font = 'bold 48px "Segoe UI", sans-serif';
+  notesCtx.textAlign = 'right';
+  notesCtx.fillText(formatYear(year), notesCanvas.width - 16, notesCanvas.height - 12);
+  notesCtx.textAlign = 'start';
+}
+
+function getCanvasPos(e) {
+  const rect = notesCanvas.getBoundingClientRect();
+  const scaleX = notesCanvas.width / rect.width;
+  const scaleY = notesCanvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+notesCanvas.addEventListener('mousedown', (e) => {
+  if (notesTool === 'text') {
+    const pos = getCanvasPos(e);
+    addTextAtPosition(pos.x, pos.y);
+    return;
+  }
+  isDrawing = true;
+  const pos = getCanvasPos(e);
+  notesCtx.beginPath();
+  notesCtx.moveTo(pos.x, pos.y);
+  notesCtx.strokeStyle = notesTool === 'eraser' ? '#faf9f5' : notesBrushColor;
+  notesCtx.lineWidth = notesTool === 'eraser' ? notesBrushSize * 3 : notesBrushSize;
+  notesCtx.lineCap = 'round';
+  notesCtx.lineJoin = 'round';
+});
+
+notesCanvas.addEventListener('mousemove', (e) => {
+  if (!isDrawing && notesTool !== 'text') return;
+  if (notesTool === 'text') return;
+  const pos = getCanvasPos(e);
+  notesCtx.lineTo(pos.x, pos.y);
+  notesCtx.stroke();
+});
+
+notesCanvas.addEventListener('mouseup', () => {
+  if (isDrawing) {
+    isDrawing = false;
+    notesCtx.closePath();
+    saveNotesForYear(currentYear);
+  }
+});
+
+notesCanvas.addEventListener('mouseleave', () => {
+  if (isDrawing) {
+    isDrawing = false;
+    notesCtx.closePath();
+    saveNotesForYear(currentYear);
+  }
+});
+
+// Touch support
+notesCanvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (notesTool === 'text') return;
+  isDrawing = true;
+  const touch = e.touches[0];
+  const pos = getCanvasPos(touch);
+  notesCtx.beginPath();
+  notesCtx.moveTo(pos.x, pos.y);
+  notesCtx.strokeStyle = notesTool === 'eraser' ? '#faf9f5' : notesBrushColor;
+  notesCtx.lineWidth = notesTool === 'eraser' ? notesBrushSize * 3 : notesBrushSize;
+  notesCtx.lineCap = 'round';
+  notesCtx.lineJoin = 'round';
+});
+
+notesCanvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const touch = e.touches[0];
+  const pos = getCanvasPos(touch);
+  notesCtx.lineTo(pos.x, pos.y);
+  notesCtx.stroke();
+});
+
+notesCanvas.addEventListener('touchend', () => {
+  if (isDrawing) {
+    isDrawing = false;
+    notesCtx.closePath();
+    saveNotesForYear(currentYear);
+  }
+});
+
+function setNotesTool(tool) {
+  notesTool = tool;
+  document.querySelectorAll('.notes-toolbar .btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tool' + tool.charAt(0).toUpperCase() + tool.slice(1)).classList.add('active');
+  notesCanvas.className = tool === 'eraser' ? 'eraser' : '';
+}
+
+function updateBrushColor() {
+  notesBrushColor = document.getElementById('notesColor').value;
+}
+
+function updateBrushSize() {
+  notesBrushSize = parseInt(document.getElementById('brushSize').value);
+  document.getElementById('brushSizeLabel').textContent = notesBrushSize + 'px';
+}
+
+function addTextAtPosition(x, y) {
+  const text = prompt('输入文字:', '');
+  if (!text) return;
+  notesCtx.fillStyle = notesBrushColor;
+  notesCtx.font = `${notesBrushSize * 5}px "Segoe UI", sans-serif`;
+  notesCtx.fillText(text, x, y);
+  saveNotesForYear(currentYear);
+}
+
+function insertImage() {
+  const url = prompt('输入图片链接 URL:', '');
+  if (!url) return;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const x = notesCanvas.width / 2 - img.width / 4;
+    const y = notesCanvas.height / 2 - img.height / 4;
+    notesCtx.drawImage(img, x, y, img.width / 2, img.height / 2);
+    saveNotesForYear(currentYear);
+  };
+  img.onerror = () => {
+    // Try drawing a placeholder
+    const x = notesCanvas.width / 2 - 100;
+    const y = notesCanvas.height / 2 - 60;
+    notesCtx.fillStyle = '#e0e0e0';
+    notesCtx.fillRect(x, y, 200, 120);
+    notesCtx.fillStyle = '#666';
+    notesCtx.font = '12px "Segoe UI", sans-serif';
+    notesCtx.textAlign = 'center';
+    notesCtx.fillText('图片加载失败', x + 100, y + 55);
+    notesCtx.fillText(url, x + 100, y + 75);
+    notesCtx.textAlign = 'start';
+    saveNotesForYear(currentYear);
+  };
+  img.src = url;
+}
+
+function insertLink() {
+  const url = prompt('输入链接 URL:', 'https://');
+  if (!url) return;
+  const label = prompt('链接显示文字:', url);
+  notesCtx.fillStyle = '#1565c0';
+  notesCtx.font = `italic ${notesBrushSize * 5}px "Segoe UI", sans-serif`;
+  notesCtx.fillText(`🔗 ${label || url}`, 20, notesCanvas.height / 2);
+  // Store link data for click handling
+  if (!notesCanvas._links) notesCanvas._links = {};
+  if (!notesCanvas._links[currentYear]) notesCanvas._links[currentYear] = [];
+  notesCanvas._links[currentYear].push({
+    x: 20, y: notesCanvas.height / 2 - 15,
+    w: notesCtx.measureText(`🔗 ${label || url}`).width,
+    h: notesBrushSize * 5 + 5,
+    url: url,
+    label: label || url
+  });
+  saveNotesForYear(currentYear);
+}
+
+notesCanvas.addEventListener('click', (e) => {
+  if (notesTool !== 'pen' && notesTool !== 'eraser') return;
+  const pos = getCanvasPos(e);
+  // Check if clicked on a link
+  if (notesCanvas._links && notesCanvas._links[currentYear]) {
+    for (const link of notesCanvas._links[currentYear]) {
+      if (pos.x >= link.x && pos.x <= link.x + link.w && 
+          pos.y >= link.y && pos.y <= link.y + link.h) {
+        window.open(link.url, '_blank');
+        return;
+      }
+    }
+  }
+});
+
+function clearNotes() {
+  if (!confirm('确定清空当前时间点的所有笔记？')) return;
+  notesCtx.fillStyle = '#faf9f5';
+  notesCtx.fillRect(0, 0, notesCanvas.width, notesCanvas.height);
+  delete notesHistory[currentYear];
+  if (notesCanvas._links) delete notesCanvas._links[currentYear];
+}
+
+// ============================================================
+// MAP CONTROLS
+// ============================================================
+function mapZoomIn() { map.zoomIn(); }
+function mapZoomOut() { map.zoomOut(); }
+function mapFitWorld() { map.setView([30, 25], 3); }
+
+function toggleDraw() {
+  drawMode = !drawMode;
+  document.getElementById('btnDraw').classList.toggle('active', drawMode);
+  if (drawMode) {
+    map.addControl(drawControl);
+  } else {
+    map.removeControl(drawControl);
+  }
+}
+
+function changeTileLayer() {
+  const val = document.getElementById('tileSelect').value;
+  map.removeLayer(currentTile);
+  currentTile = tileLayers[val];
+  currentTile.addTo(map);
+}
+
+// ============================================================
+// COLLAPSE TOGGLES
+// ============================================================
+function toggleBoundaryLegend() {
+  const legend = document.getElementById('boundaryLegend');
+  const btn = document.getElementById('btnCollapseLegend');
+  const toggleBtn = legend.querySelector('.toggle-btn');
+  legend.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed');
+  toggleBtn.textContent = legend.classList.contains('collapsed') ? '▶' : '◀';
+}
+
+function toggleBottomPanel() {
+  const panel = document.getElementById('bottomPanel');
+  const btn = document.getElementById('btnCollapseBottom');
+  panel.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed');
+  // Resize map after transition
+  setTimeout(() => map.invalidateSize(), 300);
+}
+
+function onMiniSliderInput() {
+  const miniSlider = document.getElementById('mini-timeline-slider');
+  const year = sliderValToYear(parseInt(miniSlider.value));
+  updateYear(year);
+}
+
+// Update mini timeline when year changes
+function syncMiniTimeline(year) {
+  const miniSlider = document.getElementById('mini-timeline-slider');
+  const miniYear = document.getElementById('miniYear');
+  if (miniSlider && miniYear) {
+    miniSlider.value = yearToSliderVal(year);
+    miniYear.textContent = formatYear(year);
+  }
+}
+
+function goToPresent() {
+  currentYear = 2025;
+  updateYear(currentYear);
+}
+
+// ============================================================
+// ADD MARKER DIALOG
+// ============================================================
+function toggleAddMarker() {
+  const panel = document.getElementById('addMarkerPanel');
+  const overlay = document.getElementById('overlay');
+  panel.classList.toggle('show');
+  overlay.classList.toggle('show');
+  pendingMarkerLatLng = null;
+  if (!panel.classList.contains('show')) {
+    document.getElementById('markerTitle').value = '';
+    document.getElementById('markerImage').value = '';
+    document.getElementById('markerLink').value = '';
+    document.getElementById('markerNote').value = '';
+    panel.querySelector('div').textContent = '先在地图上点击选择位置，然后填写信息';
+  }
+}
+
+function saveMarker() {
+  const title = document.getElementById('markerTitle').value.trim();
+  const image = document.getElementById('markerImage').value.trim();
+  const link = document.getElementById('markerLink').value.trim();
+  const note = document.getElementById('markerNote').value.trim();
+  const startYear = parseInt(document.getElementById('markerStartYear').value);
+  const endYear = parseInt(document.getElementById('markerEndYear').value);
+
+  if (!title) { alert('请输入标题'); return; }
+  if (isNaN(startYear) || isNaN(endYear)) { alert('请输入有效的年份'); return; }
+  if (!pendingMarkerLatLng) { alert('请先在地图上点击选择位置'); return; }
+
+  const newMarker = {
+    title, image, link, note,
+    lat: pendingMarkerLatLng.lat,
+    lng: pendingMarkerLatLng.lng,
+    startYear, endYear,
+  };
+
+  markerData.push(newMarker);
+  sampleMarkers.push(newMarker);
+  const marker = addMarkerToMap(newMarker);
+  newMarker._container = marker;
+
+  // Show if within current time range
+  if (currentYear >= startYear && currentYear <= endYear) {
+    marker.addTo(map);
+    marker.setOpacity(1);
+  }
+
+  toggleAddMarker();
+  
+  // Persistence hint
+  console.log('Marker saved:', newMarker);
+  alert(`✅ 标记 "${title}" 已添加！\n刷新后标记会丢失，可通过 localStorage 持久化。`);
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+  createScaleMarks();
+  buildParallelTracks();
+  createBoundaryLayers();
+  createMarkers();
+  
+  // Initial year
+  updateYear(2025);
+  slider.value = 10000;
+  
+  // Resize handler
+  window.addEventListener('resize', resizeNotesCanvas);
+  
+  // Initial notes canvas sizing
+  setTimeout(resizeNotesCanvas, 100);
+  
+  // Load saved boundaries preference
+  updateBoundariesForYear(currentYear);
+  
+  console.log('🌍 历史地理交互地图已就绪');
+  console.log('  🖱️ 拖拽时间轴探索不同时期');
+  console.log('  ⌨️ 键盘 ← → 微调年份 (Shift+←→ 大步调整)');
+  console.log('  📌 点击地图添加标记');
+  console.log('  ✏️ 工具栏开启地图自由绘画');
+  console.log('  🗺️ 历史疆域叠加层自动随年份变化');
+  console.log('  📝 底部笔记面板随年份切换');
+  console.log('  🖊️ 笔记面板支持自由绘画、插入图片/链接');
+}
+
+// Start the app
+document.addEventListener('DOMContentLoaded', init);
+
+// Auto-save notes on year change
+const origUpdateYear = updateYear;
+updateYear = function(year) {
+  if (isDrawing) {
+    isDrawing = false;
+    notesCtx.closePath();
+  }
+  saveNotesForYear(currentYear);
+  origUpdateYear(year);
+};
+</script>
+</body>
+</html>
