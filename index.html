@@ -481,6 +481,92 @@ body {
   font-size: 16px;
 }
 
+/* Marker list panel */
+.marker-list-panel {
+  position: absolute;
+  top: 60px;
+  left: 10px;
+  z-index: 1000;
+  background: rgba(22,33,62,0.92);
+  backdrop-filter: blur(8px);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  width: 240px;
+  max-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.25s ease;
+}
+.marker-list-panel.collapsed {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  overflow: hidden;
+  padding: 4px;
+  border-radius: 50%;
+}
+.marker-list-panel h4 {
+  font-size: 12px;
+  margin: 0 0 6px 0;
+  color: var(--accent);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.marker-list-panel.collapsed h4,
+.marker-list-panel.collapsed .marker-list-scroll { display: none; }
+.marker-list-panel .toggle-btn {
+  width: 18px;
+  height: 18px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.marker-list-panel .toggle-btn:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+.marker-list-panel.collapsed .toggle-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  font-size: 16px;
+}
+.marker-list-scroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.marker-list-scroll::-webkit-scrollbar { width: 4px; }
+.marker-list-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.marker-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  transition: background 0.1s;
+}
+.marker-list-item:hover { background: rgba(255,255,255,0.08); }
+.marker-list-item .ml-year {
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 48px;
+  flex-shrink: 0;
+  font-size: 10px;
+  text-align: right;
+}
+.marker-list-item .ml-text { flex: 1; min-width: 0; }
+.marker-list-item .ml-title { color: var(--text); }
+.marker-list-item .ml-source { color: var(--text-dim); font-size: 9px; }
+
 /* Bottom panel collapse */
 .bottom-panel { transition: all 0.25s ease; overflow: hidden; }
 .bottom-toggle-bar {
@@ -560,6 +646,7 @@ body {
     </select>
     <span class="collapse-btns">
       <button class="btn btn-sm" id="btnCollapseLegend" onclick="toggleBoundaryLegend()" title="折叠/展开疆域图例">📋 图例</button>
+      <button class="btn btn-sm" id="btnCollapseMarkerList" onclick="toggleMarkerList()" title="折叠/展开剧情标记列表">📌 标记</button>
       <button class="btn btn-sm" id="btnCollapseBottom" onclick="toggleBottomPanel()" title="折叠/展开底部面板">⬇ 底部</button>
       <button class="btn btn-sm" onclick="exportAllData()" title="导出所有数据">📤 导出</button>
       <button class="btn btn-sm" onclick="importAllData()" title="从文件导入数据">📥 导入</button>
@@ -581,6 +668,12 @@ body {
       <button class="toggle-btn" onclick="toggleBoundaryLegend()" title="折叠/展开">◀</button>
       <h4>历史疆域</h4>
       <div id="boundaryList"></div>
+    </div>
+    <!-- Marker list panel -->
+    <div class="marker-list-panel" id="markerListPanel">
+      <button class="toggle-btn" onclick="toggleMarkerList()" title="折叠/展开">◀</button>
+      <h4>📌 剧情标记 <span style="font-size:10px;color:var(--text-dim)" id="markerCount"></span></h4>
+      <div class="marker-list-scroll" id="markerListScroll"></div>
     </div>
   </div>
 </div>
@@ -1846,6 +1939,76 @@ function toggleBottomPanel() {
   setTimeout(() => map.invalidateSize(), 300);
 }
 
+// ============================================================
+// MARKER LIST PANEL
+// ============================================================
+function buildMarkerList() {
+  const container = document.getElementById('markerListScroll');
+  const countEl = document.getElementById('markerCount');
+  
+  // Sort markers by startYear
+  const sorted = [...sampleMarkers].sort((a, b) => a.startYear - b.startYear);
+  
+  countEl.textContent = `(${sorted.length})`;
+  
+  sorted.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'marker-list-item';
+    div.title = m.note || '';
+    
+    const yearStr = m.startYear < 0 ? `${Math.abs(m.startYear)}BC` : `${m.startYear}CE`;
+    
+    // Determine source
+    let source = '';
+    if (m.title.includes('龙族') || m.title.includes('白帝城') || m.title.includes('三峡') || 
+        m.title.includes('珍珠港') || m.title.includes('通古斯') || m.title.includes('阪神') ||
+        m.title.includes('蒲公英') || m.title.includes('亚历山大东征') || m.title.includes('柏林') ||
+        m.title.includes('阿根廷') || m.title.includes('赫尔佐格') || m.title.includes('汉高') ||
+        m.title.includes('卡塞尔') || m.title.includes('芝加哥') || m.title.includes('北京') ||
+        m.title.includes('东京') || m.title.includes('西伯利亚') || m.title.includes('富士山') ||
+        m.title.includes('北极')) {
+      source = '龙族';
+    } else if (m.title.includes('寻找前世之旅') || m.title.includes('底比斯') || m.title.includes('咸阳宫') ||
+               m.title.includes('特洛伊') || m.title.includes('平安京') || m.title.includes('巴比伦') ||
+               m.title.includes('克诺索斯') || m.title.includes('佛罗伦萨') || m.title.includes('特诺奇蒂特兰') ||
+               m.title.includes('凡尔赛') || m.title.includes('临安') || m.title.includes('长安城')) {
+      source = '寻找前世之旅';
+    } else {
+      source = '史实';
+    }
+    
+    div.innerHTML = `
+      <span class="ml-year">${yearStr}</span>
+      <span class="ml-text">
+        <span class="ml-title">${m.title}</span>
+        <span class="ml-source">[${source}]</span>
+      </span>
+    `;
+    
+    div.onclick = () => {
+      currentYear = m.startYear;
+      updateYear(currentYear);
+      // Open popup on the marker
+      if (m._container) {
+        const latlng = m._container.getLatLng();
+        map.setView(latlng, Math.max(map.getZoom(), 5));
+        m._container.openPopup();
+      }
+    };
+    
+    container.appendChild(div);
+  });
+}
+
+function toggleMarkerList() {
+  const panel = document.getElementById('markerListPanel');
+  const btn = document.getElementById('btnCollapseMarkerList');
+  const toggleBtn = panel.querySelector('.toggle-btn');
+  panel.classList.toggle('collapsed');
+  btn.classList.toggle('collapsed');
+  toggleBtn.textContent = panel.classList.contains('collapsed') ? '▶' : '◀';
+}
+
 function onMiniSliderInput() {
   const miniSlider = document.getElementById('mini-timeline-slider');
   const year = sliderValToYear(parseInt(miniSlider.value));
@@ -1931,6 +2094,10 @@ function saveMarker() {
   }
 
   toggleAddMarker();
+  
+  // Rebuild marker list
+  document.getElementById('markerListScroll').innerHTML = '';
+  buildMarkerList();
   
   // Save to localStorage
   saveDataToStorage();
@@ -2103,6 +2270,7 @@ function init() {
   buildParallelTracks();
   createBoundaryLayers();
   createMarkers();
+  buildMarkerList();
   
   // Load saved data from localStorage
   loadDataFromStorage();
