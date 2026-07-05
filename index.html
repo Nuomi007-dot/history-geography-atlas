@@ -671,9 +671,10 @@ body {
   <h3>📌 在地图上添加标记</h3>
   <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">先在地图上点击选择位置，然后填写信息</div>
   <input type="text" id="markerTitle" placeholder="标题（如：罗马斗兽场）">
-  <input type="text" id="markerImage" placeholder="图片链接 URL">
-  <input type="text" id="markerLink" placeholder="参考链接 URL">
-  <textarea id="markerNote" placeholder="随记内容..."></textarea>
+  <input type="text" id="markerImage" placeholder="图片链接 URL（漫画截图等）">
+  <input type="text" id="markerLink" placeholder="参考/章节跳转链接 URL">
+  <textarea id="markerNote" placeholder="随记内容 / 剧情摘要..."></textarea>
+  <input type="text" id="markerQuote" placeholder="原文引用（可选，显示在弹窗中）">
   <div style="display:flex;gap:8px;">
     <input type="number" id="markerStartYear" placeholder="起始年份" style="flex:1" value="1900">
     <input type="number" id="markerEndYear" placeholder="结束年份" style="flex:1" value="2025">
@@ -701,6 +702,7 @@ let drawnItems;
 let drawControl;
 let markerData = [];
 let pendingMarkerLatLng = null;
+let editingMarkerIndex = -1; // -1 = add new, >=0 = editing existing
 let notesTool = 'pen';
 let notesLayers = {}; // year -> canvas data
 
@@ -1649,7 +1651,8 @@ function buildMarkerList() {
   
   countEl.textContent = `(${sorted.length})`;
   
-  sorted.forEach(m => {
+  sorted.forEach((m, idx) => {
+    const realIdx = sampleMarkers.indexOf(m);
     const div = document.createElement('div');
     div.className = 'marker-list-item';
     div.title = m.note || '';
@@ -1677,16 +1680,17 @@ function buildMarkerList() {
     
     div.innerHTML = `
       <span class="ml-year">${yearStr}</span>
-      <span class="ml-text">
+      <span class="ml-text" style="flex:1;min-width:0">
         <span class="ml-title">${m.title}</span>
         <span class="ml-source">[${source}]</span>
       </span>
+      <button class="btn btn-sm" style="padding:1px 5px;font-size:10px;flex-shrink:0;opacity:0.5" onclick="event.stopPropagation();editMarker(${realIdx})" title="编辑标记">✏️</button>
     `;
     
-    div.onclick = () => {
+    div.onclick = (e) => {
+      if (e.target.tagName === 'BUTTON') return;
       currentYear = m.startYear;
       updateYear(currentYear);
-      // Open popup on the marker
       if (m._container) {
         const latlng = m._container.getLatLng();
         map.setView(latlng, Math.max(map.getZoom(), 5));
@@ -1752,13 +1756,36 @@ function toggleAddMarker() {
   panel.classList.toggle('show');
   overlay.classList.toggle('show');
   pendingMarkerLatLng = null;
+  editingMarkerIndex = -1;
   if (!panel.classList.contains('show')) {
     document.getElementById('markerTitle').value = '';
     document.getElementById('markerImage').value = '';
     document.getElementById('markerLink').value = '';
     document.getElementById('markerNote').value = '';
+    document.getElementById('markerQuote').value = '';
+    panel.querySelector('h3').textContent = '📌 在地图上添加标记';
     panel.querySelector('div').textContent = '先在地图上点击选择位置，然后填写信息';
   }
+}
+
+function editMarker(idx) {
+  const m = sampleMarkers[idx];
+  if (!m) return;
+  editingMarkerIndex = idx;
+  const panel = document.getElementById('addMarkerPanel');
+  const overlay = document.getElementById('overlay');
+  panel.classList.add('show');
+  overlay.classList.add('show');
+  pendingMarkerLatLng = { lat: m.lat, lng: m.lng };
+  document.getElementById('markerTitle').value = m.title || '';
+  document.getElementById('markerImage').value = m.image || '';
+  document.getElementById('markerLink').value = m.link || '';
+  document.getElementById('markerNote').value = m.note || '';
+  document.getElementById('markerQuote').value = m.quote || '';
+  document.getElementById('markerStartYear').value = m.startYear;
+  document.getElementById('markerEndYear').value = m.endYear;
+  panel.querySelector('h3').textContent = '✏️ 编辑标记';
+  panel.querySelector('div').textContent = '修改信息后点击保存';
 }
 
 function saveMarker() {
@@ -1766,41 +1793,64 @@ function saveMarker() {
   const image = document.getElementById('markerImage').value.trim();
   const link = document.getElementById('markerLink').value.trim();
   const note = document.getElementById('markerNote').value.trim();
+  const quote = document.getElementById('markerQuote').value.trim();
   const startYear = parseInt(document.getElementById('markerStartYear').value);
   const endYear = parseInt(document.getElementById('markerEndYear').value);
 
   if (!title) { alert('请输入标题'); return; }
   if (isNaN(startYear) || isNaN(endYear)) { alert('请输入有效的年份'); return; }
-  if (!pendingMarkerLatLng) { alert('请先在地图上点击选择位置'); return; }
 
-  const newMarker = {
-    title, image, link, note,
-    lat: pendingMarkerLatLng.lat,
-    lng: pendingMarkerLatLng.lng,
-    startYear, endYear,
-  };
-
-  markerData.push(newMarker);
-  sampleMarkers.push(newMarker);
-  const marker = addMarkerToMap(newMarker);
-  newMarker._container = marker;
-
-  // Show if within current time range
-  if (currentYear >= startYear && currentYear <= endYear) {
-    marker.addTo(map);
-    marker.setOpacity(1);
+  if (editingMarkerIndex >= 0) {
+    // Edit existing marker
+    const m = sampleMarkers[editingMarkerIndex];
+    m.title = title;
+    m.image = image;
+    m.link = link;
+    m.note = note;
+    m.quote = quote;
+    m.startYear = startYear;
+    m.endYear = endYear;
+    if (pendingMarkerLatLng) {
+      m.lat = pendingMarkerLatLng.lat;
+      m.lng = pendingMarkerLatLng.lng;
+    }
+    // Update map marker
+    if (m._container) {
+      if (map.hasLayer(m._container)) map.removeLayer(m._container);
+    }
+    const newMarker = addMarkerToMap(m);
+    m._container = newMarker;
+    if (currentYear >= startYear && currentYear <= endYear) {
+      newMarker.addTo(map);
+      newMarker.setOpacity(1);
+    }
+    toggleAddMarker();
+    saveDataToStorage();
+    console.log('Marker updated:', m.title);
+  } else {
+    // Add new marker
+    if (!pendingMarkerLatLng) { alert('请先在地图上点击选择位置'); return; }
+    const newMarker = {
+      title, image, link, note, quote,
+      lat: pendingMarkerLatLng.lat,
+      lng: pendingMarkerLatLng.lng,
+      startYear, endYear,
+    };
+    markerData.push(newMarker);
+    sampleMarkers.push(newMarker);
+    const marker = addMarkerToMap(newMarker);
+    newMarker._container = marker;
+    if (currentYear >= startYear && currentYear <= endYear) {
+      marker.addTo(map);
+      marker.setOpacity(1);
+    }
+    toggleAddMarker();
+    saveDataToStorage();
+    console.log('Marker saved:', newMarker);
   }
-
-  toggleAddMarker();
-  
   // Rebuild marker list
   document.getElementById('markerListScroll').innerHTML = '';
   buildMarkerList();
-  
-  // Save to localStorage
-  saveDataToStorage();
-  console.log('Marker saved:', newMarker);
-  alert(`✅ 标记 "${title}" 已添加！数据已自动保存。`);
 }
 
 // ============================================================
