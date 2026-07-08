@@ -672,7 +672,12 @@ body {
   <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">先在地图上点击选择位置，然后填写信息</div>
   <input type="text" id="markerTitle" placeholder="标题（如：罗马斗兽场）">
   <input type="text" id="markerImage" placeholder="图片链接 URL（漫画截图等）">
-  <input type="text" id="markerLink" placeholder="参考/章节跳转链接 URL">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+    <label style="font-size:11px;color:var(--text-dim);white-space:nowrap;">📒 笔记基地址</label>
+    <input type="text" id="noteBaseUrl" placeholder="https://mubu.com/doc/" value="https://mubu.com/doc/" style="flex:1;font-size:12px;padding:6px;" oninput="localStorage.setItem('history_map_note_base', this.value.trim())">
+    <span style="font-size:10px;color:var(--text-dim);white-space:nowrap;">填短ID即可</span>
+  </div>
+  <input type="text" id="markerLink" placeholder="链接URL，或只填幕布短ID（如 abc123）">
   <textarea id="markerNote" placeholder="随记内容 / 剧情摘要..."></textarea>
   <input type="text" id="markerQuote" placeholder="原文引用（可选，显示在弹窗中）">
   <div style="display:flex;gap:8px;">
@@ -856,7 +861,7 @@ const sampleMarkers = [
     lat: 31.04, lng: 109.57,
     startYear: 2009, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '路明非与诺诺乘摩尼亚赫号进入三峡水域，在暴风雨夜潜入水下青铜城。白帝城下隐藏着龙族文明——青铜与火之王诺顿的寝宫。路明非首次与路鸣泽交易，击杀龙王诺顿。',
     quote: '「哥哥，你终于来看我了。」——路鸣泽'
   },
@@ -865,7 +870,7 @@ const sampleMarkers = [
     lat: 41.7, lng: -87.5,
     startYear: 2009, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '位于芝加哥远郊的屠龙精英学院。路明非收到入学通知书进入这所秘密学校，遇到恺撒·加图索、楚子航、陈墨瞳(诺诺)、芬格尔等人。执行部、狮心会、学生会三大势力角逐。'
   },
   {
@@ -873,7 +878,7 @@ const sampleMarkers = [
     lat: 30.82, lng: 111.0,
     startYear: 2009, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '水下80米的龙族青铜古城，青铜与火之王诺顿的沉眠之地。叶胜与亚纪在此殉职，路明非首次展现S级血统之力。'
   },
   {
@@ -881,7 +886,7 @@ const sampleMarkers = [
     lat: 41.8781, lng: -87.6298,
     startYear: 2009, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '路明非乘火车抵达芝加哥，初遇古德里安教授。在这座风城开启了他的屠龙生涯。'
   },
   {
@@ -889,7 +894,7 @@ const sampleMarkers = [
     lat: 39.9042, lng: 116.4074,
     startYear: 1991, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '路明非的家乡，与婶婶、叔叔、表弟路鸣泽同住。一个平凡的衰小孩在这里度过了18年，直到卡塞尔学院之门为他打开。'
   },
   {
@@ -897,7 +902,7 @@ const sampleMarkers = [
     lat: 35.6895, lng: 139.6917,
     startYear: 2012, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '龙族Ⅲ主舞台。路明非、恺撒、楚子航三人组潜入日本，在歌舞伎町遇到上杉绘梨衣——蛇岐八家上杉家主。黑道、牛郎店、极道火并，绘梨衣的"世界很温柔"让无数读者落泪。',
     quote: '「04.24，和Sakura去东京天空树，世界上最暖和的地方在天空树的顶上。」——上杉绘梨衣'
   },
@@ -906,7 +911,7 @@ const sampleMarkers = [
     lat: 35.55, lng: 139.85,
     startYear: 2012, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '白王赫尔佐格最终觉醒之地。"04.24，和Sakura去东京天空树……"绘梨衣留下的日记在此终结。路明非以四分之一命交换力量，杀死赫尔佐格。黑月之潮终章。',
     quote: '「世界很温柔，但它不喜欢我。」——上杉绘梨衣'
   },
@@ -915,7 +920,7 @@ const sampleMarkers = [
     lat: 72.0, lng: 102.5,
     startYear: 1991, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '前苏联北极圈秘密研究站。赫尔佐格在此进行龙族基因实验。零号(路鸣泽)在此觉醒。冰海之上，邦达列夫少校与赫尔佐格的命运交织。'
   },
   {
@@ -923,7 +928,7 @@ const sampleMarkers = [
     lat: 44.30, lng: 9.21,
     startYear: 2009, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '加图索家族所在地。恺撒·加图索的故乡，地中海沿岸的富豪别墅群。庞贝·加图索掌控的古老家族总部。'
   },
   {
@@ -931,7 +936,7 @@ const sampleMarkers = [
     lat: 35.3606, lng: 138.7274,
     startYear: 2012, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '蛇岐八家总部所在地附近。日本分部执行局局长源稚生、源稚女(风间琉璃)的宿命纠缠在此展开。'
   },
   {
@@ -939,7 +944,7 @@ const sampleMarkers = [
     lat: 82.5, lng: -60.0,
     startYear: 2018, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '最终决战之地。黑王尼德霍格的苏醒之所。路明非追寻世界的终极秘密，踏入北极冰原之下的尼伯龙根。'
   },
   // ===== 寻找前世之旅 by Vivibear =====
@@ -948,7 +953,7 @@ const sampleMarkers = [
     lat: 25.7, lng: 32.65,
     startYear: -1279, endYear: -1213,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '叶隐穿越到拉美西斯二世统治时期的古埃及。她卷入宫廷阴谋，与年轻的法老拉美西斯产生情愫。任务：化解一位现代埃及女孩的前世诅咒。'
   },
   {
@@ -956,7 +961,7 @@ const sampleMarkers = [
     lat: 34.33, lng: 108.7,
     startYear: -221, endYear: -206,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '叶隐穿越到秦始皇时期。她来到咸阳宫，直面嬴政的残暴与孤独。在焚书坑儒的阴影下，她试图改变一位文人的悲惨命运。'
   },
   {
@@ -964,7 +969,7 @@ const sampleMarkers = [
     lat: 39.95, lng: 26.23,
     startYear: -1250, endYear: -1180,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '叶隐穿越到特洛伊战争时期。她见证了木马计、阿喀琉斯的愤怒、赫克托耳的悲壮。任务与海伦有关。'
   },
   {
@@ -972,7 +977,7 @@ const sampleMarkers = [
     lat: 35.02, lng: 135.76,
     startYear: 794, endYear: 1000,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '叶隐穿越到日本平安时代。在樱花飘落的平安京，她遇到了阴阳师安倍晴明和一位神秘的白狐少年。'
   },
   {
@@ -980,7 +985,7 @@ const sampleMarkers = [
     lat: 32.54, lng: 44.42,
     startYear: -600, endYear: -562,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '叶隐穿越到尼布甲尼撒二世时期的巴比伦。空中花园下，她卷入巴比伦之囚的悲剧与一段跨越千年的守望。'
   },
   {
@@ -988,7 +993,7 @@ const sampleMarkers = [
     lat: 34.26, lng: 108.94,
     startYear: 755, endYear: 763,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '安史之乱下的长安。叶隐在这座万国来朝的繁华都城遭遇叛军围城，见证盛世崩塌。与一位诗人(李白)结下缘分。'
   },
   {
@@ -996,7 +1001,7 @@ const sampleMarkers = [
     lat: 43.77, lng: 11.26,
     startYear: 1490, endYear: 1520,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '在文艺复兴的巅峰时期，叶隐来到美第奇家族的佛罗伦萨。她遇见了年轻的达·芬奇，卷入艺术、阴谋与禁忌之恋。'
   },
   {
@@ -1004,7 +1009,7 @@ const sampleMarkers = [
     lat: 35.3, lng: 25.16,
     startYear: -1600, endYear: -1450,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '叶隐穿越到米诺斯文明时期。迷宫中的牛头怪传说背后，隐藏着一段残酷的真相与禁忌之爱。'
   },
   {
@@ -1012,7 +1017,7 @@ const sampleMarkers = [
     lat: 48.86, lng: 2.35,
     startYear: 1200, endYear: 1300,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '中世纪的巴黎，瘟疫与宗教审判笼罩全城。叶隐在巴黎圣母院的阴影下，为一位被指控为女巫的女子寻求救赎。'
   },
   {
@@ -1020,7 +1025,7 @@ const sampleMarkers = [
     lat: 19.43, lng: -99.13,
     startYear: 1500, endYear: 1521,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '西班牙征服者抵达前夕，叶隐来到阿兹特克帝国的首都。太阳金字塔上，她目睹了古老文明的最后荣光与残酷献祭。'
   },
   {
@@ -1028,7 +1033,7 @@ const sampleMarkers = [
     lat: 30.25, lng: 120.16,
     startYear: 1127, endYear: 1279,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '南宋临安，西湖边茶馆"前世今生"的原型所在。叶隐的师父司音在此经营神秘的茶馆，连接着各个时空。这里是所有穿越的起点。'
   },
   {
@@ -1036,7 +1041,7 @@ const sampleMarkers = [
     lat: 48.80, lng: 2.12,
     startYear: 1770, endYear: 1789,
     image: '',
-    link: 'https://weread.qq.com/web/reader/57f32da0719bdf4057f6bb9',
+    link: '',
     note: '法国大革命前夜的凡尔赛宫。叶隐在路易十六与玛丽·安托瓦内特的奢华宫廷中，预感到了即将到来的血雨腥风。'
   },
   // ===== 龙族 历史暗线事件 =====
@@ -1045,7 +1050,7 @@ const sampleMarkers = [
     lat: 60.9, lng: 101.9,
     startYear: 1908, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '1908年6月30日，西伯利亚通古斯河上空发生巨大爆炸。龙族世界观中，这是黑王尼德霍格复苏的征兆之一，龙王级力量的释放导致了2000平方公里的森林被摧毁。'
   },
   {
@@ -1053,7 +1058,7 @@ const sampleMarkers = [
     lat: 31.2, lng: 29.9,
     startYear: -332, endYear: -323,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '亚历山大大帝东征至埃及时，在西瓦绿洲获得了记载龙族秘密的翠玉录(Emerald Tablet)。这块翠绿石板包含了龙族炼金术的最高奥义——"如其在上，如其在下"。'
   },
   {
@@ -1061,7 +1066,7 @@ const sampleMarkers = [
     lat: 31.04, lng: 109.57,
     startYear: 25, endYear: 36,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '两汉之交，公孙述据蜀称白帝，筑白帝城。龙族设定中，公孙述实为青铜与火之王诺顿的人间化身。他在此建立要塞，守护水下青铜城的入口。后为刘秀所灭。'
   },
   {
@@ -1069,7 +1074,7 @@ const sampleMarkers = [
     lat: 21.36, lng: -157.95,
     startYear: 1941, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '1941年12月7日，日本偷袭珍珠港。龙族设定中，此次袭击背后有日本分部蛇岐八家的推动，意在唤醒沉睡于太平洋深处的某种龙族力量。美日开战改变了秘党在亚太的布局。'
   },
   {
@@ -1077,7 +1082,7 @@ const sampleMarkers = [
     lat: 52.52, lng: 13.40,
     startYear: 1945, endYear: 1945,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '1945年4月30日，希特勒在柏林地堡中自杀。龙族中，希特勒之死伴随着德国境内多处尼伯龙根入口的崩溃，秘党趁机清除了纳粹内部的龙族遗存研究——"沃登计划"。'
   },
   {
@@ -1085,7 +1090,7 @@ const sampleMarkers = [
     lat: -34.6, lng: -58.38,
     startYear: 1945, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '二战后，纳粹残党通过"鼠线"逃亡阿根廷。龙族中，携带龙族实验资料的纳粹科学家文森特逃至布宜诺斯艾利斯，在南美继续龙族杂交实验，成为秘党南美分部的长期追踪目标。'
   },
   {
@@ -1093,7 +1098,7 @@ const sampleMarkers = [
     lat: 72.0, lng: 102.5,
     startYear: 1960, endYear: 1991,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '1960年代，德国遗孤赫尔佐格被苏联安置在西伯利亚北极圈内的黑天鹅港研究站。在此他进行了数十年的龙族基因杂交实验，创造了零号(路鸣泽)与绘梨衣等混血种。前苏联解体后，实验站废弃。'
   },
   {
@@ -1101,7 +1106,7 @@ const sampleMarkers = [
     lat: 51.51, lng: -0.13,
     startYear: 1940, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '汉高(Henkel)家族是欧洲秘党元老。1940年代伦敦大轰炸期间，汉高与希尔伯特·让·昂热在伦敦某废弃地铁站秘密会面，商讨对抗纳粹利用龙族力量的计划。一枚炸弹险些将两人埋葬。'
   },
   {
@@ -1109,7 +1114,7 @@ const sampleMarkers = [
     lat: 30.82, lng: 111.0,
     startYear: 1994, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '1994年三峡大坝正式动工。龙族中，大坝建设惊动了沉眠于水下青铜城的青铜与火之王诺顿。秘党以工程为掩护，启动了对青铜城的探索行动。后叶胜、亚纪在此殉职。'
   },
   {
@@ -1117,7 +1122,7 @@ const sampleMarkers = [
     lat: 34.69, lng: 135.19,
     startYear: 1995, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '1995年1月17日，日本阪神地区发生7.3级大地震。龙族设定中，这次地震是蛇岐八家镇压的龙族封印松动所致。日本分部因此被迫调整了对混血种的政策。'
   },
   {
@@ -1125,7 +1130,7 @@ const sampleMarkers = [
     lat: 39.9, lng: 116.4,
     startYear: 2004, endYear: 2025,
     image: '',
-    link: 'https://weread.qq.com/web/reader/05e329405e3dd605ee04cec',
+    link: '',
     note: '2004年，秘党执行"蒲公英行动"。卡塞尔学院在中国境内发现混血种孤儿，以北京为中心展开大规模筛查和招募。路明非的表弟路鸣泽(真名零)在此次行动中首次进入秘党视野。'
   },
 ];
@@ -1152,7 +1157,7 @@ function addMarkerToMap(data) {
       ${data.image ? `<img src="${data.image}" alt="${data.title}" onerror="this.style.display='none'" loading="lazy">` : ''}
       <div class="note">${data.note || ''}</div>
       ${data.quote ? `<div class="quote">${data.quote}</div>` : ''}
-      ${data.link ? `<a href="${data.link}" target="_blank" rel="noopener">📖 了解更多 →</a>` : ''}
+      ${data.link ? `<a href="${data.link}" target="_blank" rel="noopener">${data.link.includes('mubu.com') ? '📒 打开幕布笔记 →' : data.link.includes('weread') ? '📖 微信读书 →' : '🔗 了解更多 →'}</a>` : ''}
     </div>
   `, { maxWidth: 350, className: 'marker-popup-container' });
   
@@ -1788,10 +1793,21 @@ function editMarker(idx) {
   panel.querySelector('div').textContent = '修改信息后点击保存';
 }
 
+// Resolve note link: full URL stays; bare ID is prefixed with 笔记基地址 (e.g. 幕布短ID)
+function resolveNoteLink(raw) {
+  raw = (raw || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  let base = (document.getElementById('noteBaseUrl').value || '').trim();
+  if (!base) return raw;
+  if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+  return base.replace(/\/+$/, '') + '/' + raw.replace(/^\/+/, '');
+}
+
 function saveMarker() {
   const title = document.getElementById('markerTitle').value.trim();
   const image = document.getElementById('markerImage').value.trim();
-  const link = document.getElementById('markerLink').value.trim();
+  const link = resolveNoteLink(document.getElementById('markerLink').value);
   const note = document.getElementById('markerNote').value.trim();
   const quote = document.getElementById('markerQuote').value.trim();
   const startYear = parseInt(document.getElementById('markerStartYear').value);
@@ -1922,6 +1938,11 @@ function loadDataFromStorage() {
     });
     
     console.log('📂 已从 localStorage 加载数据');
+    
+    // Load 笔记基地址 (default to 幕布)
+    const nb = localStorage.getItem('history_map_note_base');
+    const nbInput = document.getElementById('noteBaseUrl');
+    if (nbInput) nbInput.value = (nb !== null && nb !== '') ? nb : 'https://mubu.com/doc/';
   } catch(e) {
     console.warn('⚠️ localStorage 加载失败:', e.message);
   }
