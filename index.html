@@ -673,6 +673,12 @@ body {
   <input type="text" id="markerTitle" placeholder="标题（如：罗马斗兽场）">
   <input type="text" id="markerImage" placeholder="图片链接 URL（漫画截图等）">
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+    <label style="font-size:11px;color:var(--text-dim);white-space:nowrap;">📷 图片基地址</label>
+    <input type="text" id="imgBaseUrl" placeholder="raw.githubusercontent.com/...comics/" value="https://raw.githubusercontent.com/Nuomi007-dot/history-geography-atlas/master/comics/" style="flex:1;font-size:12px;padding:6px;" oninput="localStorage.setItem('history_map_img_base', this.value.trim())">
+    <a href="https://github.com/Nuomi007-dot/history-geography-atlas/upload/master/comics" target="_blank" title="打开 GitHub 上传漫画截图" style="font-size:11px;color:var(--accent);text-decoration:none;white-space:nowrap;">📤 上传</a>
+    <span style="font-size:10px;color:var(--text-dim);white-space:nowrap;">填文件名即可</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
     <label style="font-size:11px;color:var(--text-dim);white-space:nowrap;">📒 笔记基地址</label>
     <input type="text" id="noteBaseUrl" placeholder="https://mubu.com/doc/" value="https://mubu.com/doc/" style="flex:1;font-size:12px;padding:6px;" oninput="localStorage.setItem('history_map_note_base', this.value.trim())">
     <span style="font-size:10px;color:var(--text-dim);white-space:nowrap;">填短ID即可</span>
@@ -1793,12 +1799,13 @@ function editMarker(idx) {
   panel.querySelector('div').textContent = '修改信息后点击保存';
 }
 
-// Resolve note link: full URL stays; bare ID is prefixed with 笔记基地址 (e.g. 幕布短ID)
-function resolveNoteLink(raw) {
+// 通用基地址解析：完整URL原样返回；裸名称自动拼上对应基地址
+function resolveWithBase(raw, baseId) {
   raw = (raw || '').trim();
   if (!raw) return '';
   if (/^https?:\/\//i.test(raw)) return raw;
-  let base = (document.getElementById('noteBaseUrl').value || '').trim();
+  const el = document.getElementById(baseId);
+  let base = (el ? el.value : '').trim();
   if (!base) return raw;
   if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
   return base.replace(/\/+$/, '') + '/' + raw.replace(/^\/+/, '');
@@ -1806,8 +1813,8 @@ function resolveNoteLink(raw) {
 
 function saveMarker() {
   const title = document.getElementById('markerTitle').value.trim();
-  const image = document.getElementById('markerImage').value.trim();
-  const link = resolveNoteLink(document.getElementById('markerLink').value);
+  const image = resolveWithBase(document.getElementById('markerImage').value, 'imgBaseUrl');
+  const link = resolveWithBase(document.getElementById('markerLink').value, 'noteBaseUrl');
   const note = document.getElementById('markerNote').value.trim();
   const quote = document.getElementById('markerQuote').value.trim();
   const startYear = parseInt(document.getElementById('markerStartYear').value);
@@ -1943,6 +1950,11 @@ function loadDataFromStorage() {
     const nb = localStorage.getItem('history_map_note_base');
     const nbInput = document.getElementById('noteBaseUrl');
     if (nbInput) nbInput.value = (nb !== null && nb !== '') ? nb : 'https://mubu.com/doc/';
+    
+    // Load 图片基地址 (default to GitHub comics folder)
+    const ib = localStorage.getItem('history_map_img_base');
+    const ibInput = document.getElementById('imgBaseUrl');
+    if (ibInput) ibInput.value = (ib !== null && ib !== '') ? ib : 'https://raw.githubusercontent.com/Nuomi007-dot/history-geography-atlas/master/comics/';
   } catch(e) {
     console.warn('⚠️ localStorage 加载失败:', e.message);
   }
